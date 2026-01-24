@@ -684,6 +684,60 @@
     pointer-events:none;
   }
   .witness-pop.hidden{display:none;}
+
+  /* ★ 7：投票 */
+  .vote-pop{
+    position:fixed;
+    left:50%; top:70px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    padding:10px 12px;
+    border-radius:12px;
+    box-shadow:0 14px 32px rgba(0,0,0,.35);
+    z-index:260;
+    font-weight:700;
+    white-space:nowrap;
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .vote-pop.hidden{display:none;}
+
+  /* ★ 7：投票タグアニメ */
+  @keyframes voteTagPulse{
+    0%  { transform:translate(-50%,-50%) scale(1); }
+    50% { transform:translate(-50%,-50%) scale(1.08); }
+    100%{ transform:translate(-50%,-50%) scale(1); }
+  }
+  .player-tag.vote7-targetable{
+    cursor:pointer;
+    animation: voteTagPulse 820ms ease-in-out infinite;
+    box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
+  .player-tag.vote7-voted{
+    outline:2px solid #111;
+    outline-offset:2px;
+  }
+  .vote7-results{
+    position:absolute;
+    left:100%;
+    top:50%;
+    transform:translate(6px,-50%);
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    z-index:15;
+    pointer-events:none;
+  }
+  .vote7-result-tag{
+    background:#111;
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:999px;
+    box-shadow:0 8px 18px rgba(0,0,0,.2);
+    white-space:nowrap;
+  }
 </style>
 </head>
 <body>
@@ -760,6 +814,7 @@
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
 <div id="witnessPop" class="witness-pop hidden">5の効果：正体カード（裏）をクリックして対象選択</div>
+<div id="votePop" class="vote-pop hidden">7の効果：投票するプレイヤーを選択</div>
 
 <div id="seatPop" class="seat-pop hidden">
   <div class="row"><label>席を選択</label><div id="seatTabs" class="tabs"></div></div>
@@ -876,6 +931,7 @@ const state = {
   exchange8: null,
   surveillance6: null, // ★ 6（監視）
   witness5: null,      // ★ 5（証人）
+  vote7: null,         // ★ 7（投票）
 };
 
 const mainEl = document.getElementById('main');
@@ -892,6 +948,7 @@ const hostSelectingPop = document.getElementById('hostSelectingPop');
 const pickPop = document.getElementById('pickPop');
 const exchangePop = document.getElementById('exchangePop');
 const witnessPop = document.getElementById('witnessPop');
+const votePop = document.getElementById('votePop');
 
 const seatPop = document.getElementById('seatPop');
 const seatTabs = document.getElementById('seatTabs');
@@ -954,7 +1011,7 @@ const ROLE_HELP = [
   { name: "④ アリバイ", text: "（効果は後で実装）" },
   { name: "⑤ 証人", text: "使用者だけ：全員の扇手札の左に「正体カード裏」を出して選択。選んだプレイヤーの手札を中央に拡大表示（使用者のみ）。他プレイヤー＆対象：使用者→対象の正体カード裏へ点線矢印＋👀" },
   { name: "⑥ 監視", text: "対象プレイヤーを選択→対象の手札を中央に拡大表示（使用者のみ）／他プレイヤーと対象には点線矢印＋👀（表示中は「閉じてもいいですか？ はい」で終了）" },
-  { name: "⑦ 投票", text: "（効果は後で実装）" },
+  { name: "⑦ 投票", text: "全員が他プレイヤーのネームタグをクリックして投票。全員投票後、各プレイヤーの右に「👈投票者名」を縦表示（5秒）して次の手番へ。" },
   { name: "⑧ 交換", text: "対象を選択→対象が最小カードを選ぶ→⑧使用者へ→⑧使用者が返すカードを選ぶ→対象へ" },
   { name: "⑨ 尋問（右/左選択）", text: "右/左を選択→全員が最小カードを1枚選択→右(前の手番) / 左(次の手番)へ一斉に渡す" },
   { name: "⑬ 死神", text: "（効果は後で実装）" },
@@ -1050,6 +1107,12 @@ function witnessPhase(){ return String(state.witness5?.phase || ''); }
 function isWitnessPickingTarget(){ return isWitnessActive() && witnessPhase() === 'pickTarget'; }
 function isWitnessShowing(){ return isWitnessActive() && witnessPhase() === 'show'; }
 
+/* ★ 7（投票） */
+function isVote7Active(){ return !!state.vote7?.active; }
+function vote7Phase(){ return String(state.vote7?.phase || ''); }
+function isVote7Voting(){ return isVote7Active() && vote7Phase() === 'voting'; }
+function isVote7Revealing(){ return isVote7Active() && vote7Phase() === 'reveal'; }
+
 function calcIsPlayable(){
   const myId = state.userId;
   const hand = state.hands[myId];
@@ -1059,8 +1122,9 @@ function calcIsPlayable(){
   const exActive  = isExchangeActive();
   const wActive   = isWatchActive();
   const wiActive  = isWitnessActive();
+  const vActive   = isVote7Active();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && (count === 3);
+  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && (count === 3);
 }
 
 /* =========================
@@ -1395,6 +1459,23 @@ function updateTurnUI(){
   const showWitnessPick = !!(wiActive && wi?.phase === 'pickTarget' && wi?.by === state.userId);
   witnessPop.classList.toggle('hidden', !showWitnessPick);
 
+  // 7 pop
+  const vActive = isVote7Active();
+  if (!vActive){
+    votePop.classList.add('hidden');
+  } else {
+    votePop.classList.remove('hidden');
+    const vPhase = vote7Phase();
+    const myVoted = !!(state.vote7?.votes && state.vote7.votes[state.userId]);
+    if (vPhase === 'voting'){
+      votePop.textContent = myVoted
+        ? '7の効果：他プレイヤーが投票中'
+        : '7の効果：投票するプレイヤーを選択';
+    } else {
+      votePop.textContent = '7の効果：投票結果表示中';
+    }
+  }
+
   // 9 dir dialog
   if (isInvChoosingDir() && state.investigation?.by === state.userId){
     dirDialog.classList.remove('hidden');
@@ -1623,6 +1704,20 @@ function subscribeWitness5(){
 
     updateTurnUI();
     renderHands();
+  });
+}
+
+/* ★ 7（投票）購読 */
+function subscribeVote7(){
+  const vRef = ref(db, `rooms/${state.roomCode}/vote7`);
+  onValue(vRef, snap => {
+    const v = snap.val() || null;
+    state.vote7 = (v && typeof v === 'object') ? v : null;
+    updateTurnUI();
+    renderPlayerCircle(latestPlayers);
+    if (state.vote7?.active && state.vote7.phase === 'voting'){
+      maybeResolveVote7();
+    }
   });
 }
 
@@ -2312,6 +2407,95 @@ async function finishWitness5(){
   await advanceTurnToNextPlayer();
 }
 
+/* =========================
+   ★ 7（投票）状態機械
+   ========================= */
+function getVote7(){
+  return (state.vote7 && typeof state.vote7 === 'object') ? state.vote7 : null;
+}
+
+async function startVote7(byPlayerId){
+  if (!state.roomCode) return;
+
+  const vRef = ref(db, `rooms/${state.roomCode}/vote7`);
+  const snap = await get(vRef);
+  const cur = snap.val();
+  if (cur?.active) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+
+  await set(vRef, {
+    active: true,
+    phase: 'voting',
+    by: byPlayerId,
+    votes: {},
+    results: null,
+    at: Date.now()
+  });
+}
+
+async function pickVote7Target(targetId){
+  if (!state.roomCode) return;
+  const v = getVote7();
+  if (!v?.active) return;
+  if (v.phase !== 'voting') return;
+  const myId = state.userId;
+  if (!targetId || targetId === myId) return;
+  if (v.votes && v.votes[myId]) return;
+
+  await set(ref(db, `rooms/${state.roomCode}/vote7/votes/${myId}`), targetId);
+
+  await maybeResolveVote7();
+}
+
+async function maybeResolveVote7(){
+  if (!state.roomCode) return;
+  const v = getVote7();
+  if (!v?.active) return;
+  if (v.phase !== 'voting') return;
+
+  const players = await getSeatedPlayers();
+  if (!players.length) return;
+
+  const votes = v.votes || {};
+  const votedCount = players.filter(p => votes[p.id]).length;
+  if (votedCount !== players.length) return;
+
+  const lockRef = ref(db, `rooms/${state.roomCode}/vote7/resolveLock`);
+  const myId = state.userId;
+  const locked = await runTransaction(lockRef, (cur) => {
+    if (cur && cur.by && cur.at && (Date.now() - cur.at) < 15000) return;
+    return { by: myId, at: Date.now() };
+  }, { applyLocally:false });
+
+  if (!locked.committed) return;
+
+  try{
+    const vSnap = await get(ref(db, `rooms/${state.roomCode}/vote7`));
+    const vLatest = vSnap.val();
+    if (!vLatest?.active || vLatest.phase !== 'voting') return;
+
+    const results = buildVote7Results(vLatest, players);
+
+    await update(ref(db, `rooms/${state.roomCode}/vote7`), {
+      phase: 'reveal',
+      results,
+      revealedAt: Date.now()
+    });
+
+    await sleep(5000);
+
+    const updates = {};
+    updates[`rooms/${state.roomCode}/vote7`] = null;
+    updates[`rooms/${state.roomCode}/turn/paused`] = false;
+    await update(ref(db, `/`), updates);
+
+    await advanceTurnToNextPlayer();
+  } finally {
+    await set(ref(db, `rooms/${state.roomCode}/vote7/resolveLock`), null);
+  }
+}
+
 function renderWitnessCenterHand(targetId){
   // ★ 5は「手札」ではなく「正体」を拡大表示する
   const identity = state.hands?.[targetId]?.identity;
@@ -2882,6 +3066,11 @@ async function playCardFromHand(cardIndex){
     return;
   }
 
+  if (used === "7"){
+    await startVote7(myId);
+    return;
+  }
+
   if (used === "6"){
     await startSurveillance6(myId);
     return;
@@ -2916,6 +3105,7 @@ async function advanceTurnToNextPlayer(){
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
   if (isWitnessActive()) return;
+  if (isVote7Active()) return;
 
   const players = await getSeatedPlayers();
   if (!players.length) return;
@@ -2990,6 +3180,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeSurveillance6();
   // ★ 5（証人）
   subscribeWitness5();
+  // ★ 7（投票）
+  subscribeVote7();
 
   syncSeatUI();
 });
@@ -3103,6 +3295,23 @@ function subscribePlayers(){
   });
 }
 
+function buildVote7Results(voteData, players){
+  const results = {};
+  if (!voteData || !players?.length) return results;
+
+  const votes = voteData?.votes || {};
+  const playerIds = new Set(players.map(p => p.id));
+
+  Object.entries(votes).forEach(([voterId, targetId]) => {
+    if (!playerIds.has(voterId)) return;
+    if (!playerIds.has(targetId)) return;
+    if (!results[targetId]) results[targetId] = [];
+    results[targetId].push(voterId);
+  });
+
+  return results;
+}
+
 function renderPlayerCircle(players){
   playerCircle.innerHTML = '';
   playerCircle.appendChild(deckPile);
@@ -3138,6 +3347,14 @@ function renderPlayerCircle(players){
   const wiActive = isWitnessActive();
   const wi = getWitness5();
   const iAmWitnessBy = !!(wiActive && wi?.by === state.userId && wi?.phase === 'pickTarget');
+
+  const vActive = isVote7Active();
+  const vPhase = vote7Phase();
+  const vVotes = state.vote7?.votes || {};
+  const iHaveVoted = !!vVotes[state.userId];
+  const showVotedStatus = vActive && vPhase === 'voting' && iHaveVoted;
+  const voteResults = (vActive && vPhase === 'reveal') ? buildVote7Results(state.vote7, players) : {};
+  const playerNameMap = new Map(players.map(p => [p.id, p.name]));
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
@@ -3189,6 +3406,20 @@ function renderPlayerCircle(players){
     */
     if (iAmWitnessBy && p.id !== state.userId){
       tag.classList.add('witness5-targetable');
+    }
+
+    /* ★ 7（投票）：対象選択（全員） */
+    if (vActive && vPhase === 'voting'){
+      if (!iHaveVoted && p.id !== state.userId){
+        tag.classList.add('vote7-targetable');
+        tag.addEventListener('click', async () => {
+          await pickVote7Target(p.id);
+        });
+      }
+      if (showVotedStatus){
+        const hasVoted = !!vVotes[p.id];
+        if (hasVoted && p.id !== state.userId) tag.classList.add('vote7-voted');
+      }
     }
 
     const handData = state.hands[p.id];
@@ -3280,6 +3511,23 @@ function renderPlayerCircle(players){
     }
 
     playerCircle.appendChild(tag);
+
+    // ★ 7：結果表示（投票者タグを右側に縦表示）
+    if (vActive && vPhase === 'reveal'){
+      const voters = voteResults?.[p.id] || [];
+      if (voters.length){
+        const resultWrap = document.createElement('div');
+        resultWrap.className = 'vote7-results';
+        voters.forEach(voterId => {
+          const vName = playerNameMap.get(voterId) || '名無し';
+          const item = document.createElement('div');
+          item.className = 'vote7-result-tag';
+          item.textContent = `👈${vName}`;
+          resultWrap.appendChild(item);
+        });
+        tag.appendChild(resultWrap);
+      }
+    }
   });
 
   updateTurnUI();
@@ -3410,6 +3658,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/exchangeEvent`), null),
     set(ref(db, `rooms/${state.roomCode}/surveillance6`), null),
     set(ref(db, `rooms/${state.roomCode}/witness5`), null),
+    set(ref(db, `rooms/${state.roomCode}/vote7`), null),
   ]);
 
   if (initialDrawDisp){
@@ -3448,6 +3697,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/exchangeEvent`)),
     remove(ref(db, `${base}/surveillance6`)),
     remove(ref(db, `${base}/witness5`)),
+    remove(ref(db, `${base}/vote7`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
