@@ -278,6 +278,21 @@
     outline-offset:2px;
   }
 
+  /* ★ 7：投票（全員がネームタグを選択） */
+  @keyframes voteTagPulse{
+    0%{transform:translate(-50%,-50%) scale(1);}
+    50%{transform:translate(-50%,-50%) scale(1.08);}
+    100%{transform:translate(-50%,-50%) scale(1);}
+  }
+  .player-tag.vote7-targetable{
+    animation: voteTagPulse 760ms ease-in-out infinite;
+    cursor:pointer;
+  }
+  .player-tag.vote7-picked{
+    outline:2px solid #111;
+    outline-offset:2px;
+  }
+
   /* ★ 8：交換フェーズ（対象選択中）miniをパルス */
   @keyframes miniPulse{
     0%{transform:translate(-50%,0) rotate(var(--rot,0deg)) scale(1);}
@@ -684,6 +699,42 @@
     pointer-events:none;
   }
   .witness-pop.hidden{display:none;}
+
+  /* ★ 7：結果表示（中央） */
+  .vote7-result{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(255,255,255,.96);
+    border:2px solid #111;
+    border-radius:16px;
+    padding:12px 16px;
+    box-shadow:0 18px 40px rgba(0,0,0,.22);
+    z-index:40;
+    min-width:200px;
+    text-align:center;
+  }
+  .vote7-result.hidden{display:none;}
+  .vote7-line{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:center;
+    justify-content:center;
+    margin:6px 0;
+    font-weight:800;
+  }
+  .vote7-tag{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#f8f8f8;
+    border:1px solid #ddd;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  .vote7-arrow{font-size:16px;}
 </style>
 </head>
 <body>
@@ -716,6 +767,9 @@
       <div id="centerArea" class="center-area">CENTER</div>
 
       <div id="discardStack" class="discard-stack"></div>
+
+      <!-- ★ 7：投票結果（中央表示） -->
+      <div id="vote7Result" class="vote7-result hidden"></div>
 
       <!-- ★ 8：点線矢印リンク用SVG -->
       <svg id="linkLayer" class="link-layer"></svg>
@@ -854,6 +908,7 @@ const RESHUFFLE_ANIM_MS = 980;
 const TRANSFER_ANIM_MS = 620;
 const EXCHANGE_ANIM_MS = 620;
 const EXCHANGE_WAIT_BEFORE_MOVE_MS = 1000;
+const VOTE7_RESULT_MS = 5000;
 
 /* ★ 6（監視） */
 const WATCH6_MAX_AGE_MS = 60000;
@@ -876,6 +931,7 @@ const state = {
   exchange8: null,
   surveillance6: null, // ★ 6（監視）
   witness5: null,      // ★ 5（証人）
+  vote7: null,         // ★ 7（投票）
 };
 
 const mainEl = document.getElementById('main');
@@ -907,6 +963,7 @@ const watchLayer = document.getElementById('watchLayer');
 const witnessLayer = document.getElementById('witnessLayer');
 
 const discardStackEl = document.getElementById('discardStack');
+const vote7ResultEl = document.getElementById('vote7Result');
 
 const myHandEl = document.getElementById('myHand');
 const myIdentityEl = document.getElementById('myIdentity');
@@ -954,7 +1011,7 @@ const ROLE_HELP = [
   { name: "④ アリバイ", text: "（効果は後で実装）" },
   { name: "⑤ 証人", text: "使用者だけ：全員の扇手札の左に「正体カード裏」を出して選択。選んだプレイヤーの手札を中央に拡大表示（使用者のみ）。他プレイヤー＆対象：使用者→対象の正体カード裏へ点線矢印＋👀" },
   { name: "⑥ 監視", text: "対象プレイヤーを選択→対象の手札を中央に拡大表示（使用者のみ）／他プレイヤーと対象には点線矢印＋👀（表示中は「閉じてもいいですか？ はい」で終了）" },
-  { name: "⑦ 投票", text: "（効果は後で実装）" },
+  { name: "⑦ 投票", text: "全員が他プレイヤーのネームタグを選択。選択が完了したプレイヤーは黒枠表示。全員選択後、中央に結果を5秒表示。" },
   { name: "⑧ 交換", text: "対象を選択→対象が最小カードを選ぶ→⑧使用者へ→⑧使用者が返すカードを選ぶ→対象へ" },
   { name: "⑨ 尋問（右/左選択）", text: "右/左を選択→全員が最小カードを1枚選択→右(前の手番) / 左(次の手番)へ一斉に渡す" },
   { name: "⑬ 死神", text: "（効果は後で実装）" },
@@ -1050,6 +1107,12 @@ function witnessPhase(){ return String(state.witness5?.phase || ''); }
 function isWitnessPickingTarget(){ return isWitnessActive() && witnessPhase() === 'pickTarget'; }
 function isWitnessShowing(){ return isWitnessActive() && witnessPhase() === 'show'; }
 
+/* ★ 7（投票） */
+function isVote7Active(){ return !!state.vote7?.active; }
+function vote7Phase(){ return String(state.vote7?.phase || ''); }
+function isVote7Picking(){ return isVote7Active() && vote7Phase() === 'pick'; }
+function isVote7Showing(){ return isVote7Active() && vote7Phase() === 'result'; }
+
 function calcIsPlayable(){
   const myId = state.userId;
   const hand = state.hands[myId];
@@ -1059,8 +1122,9 @@ function calcIsPlayable(){
   const exActive  = isExchangeActive();
   const wActive   = isWatchActive();
   const wiActive  = isWitnessActive();
+  const vActive   = isVote7Active();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && (count === 3);
+  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && (count === 3);
 }
 
 /* =========================
@@ -1623,6 +1687,37 @@ function subscribeWitness5(){
 
     updateTurnUI();
     renderHands();
+  });
+}
+
+/* ★ 7（投票）購読 */
+let vote7FinalizeTimer = null;
+function subscribeVote7(){
+  const vRef = ref(db, `rooms/${state.roomCode}/vote7`);
+  onValue(vRef, snap => {
+    const v = snap.val() || null;
+    state.vote7 = (v && typeof v === 'object') ? v : null;
+
+    if (vote7FinalizeTimer){
+      clearTimeout(vote7FinalizeTimer);
+      vote7FinalizeTimer = null;
+    }
+
+    updateTurnUI();
+    renderHands();
+    updateVote7ResultUI();
+
+    if (isVote7Showing()){
+      const showUntil = Number(state.vote7?.showUntil || 0);
+      const delay = showUntil - Date.now();
+      if (delay > 0){
+        vote7FinalizeTimer = setTimeout(() => {
+          maybeFinalizeVote7();
+        }, delay + 20);
+      } else {
+        maybeFinalizeVote7();
+      }
+    }
   });
 }
 
@@ -2368,6 +2463,174 @@ witnessBackdrop.addEventListener('click', (e) => {
 });
 
 /* =========================
+   7（投票）
+   ========================= */
+function getVote7(){
+  return (state.vote7 && typeof state.vote7 === 'object') ? state.vote7 : null;
+}
+
+function buildVote7Results(selections, players){
+  const bucket = new Map();
+  const voterOrder = players.map(p => p.id);
+  const targetOrder = players.map(p => p.id);
+
+  voterOrder.forEach((voterId) => {
+    const sel = selections?.[voterId];
+    if (!sel?.targetId) return;
+    if (!bucket.has(sel.targetId)) bucket.set(sel.targetId, []);
+    bucket.get(sel.targetId).push(voterId);
+  });
+
+  const results = [];
+  targetOrder.forEach((targetId) => {
+    const voters = bucket.get(targetId);
+    if (voters && voters.length){
+      results.push({ targetId, voters });
+    }
+  });
+  return results;
+}
+
+async function startVote7(byPlayerId){
+  if (!state.roomCode) return;
+  const vRef = ref(db, `rooms/${state.roomCode}/vote7`);
+  const snap = await get(vRef);
+  const cur = snap.val();
+  if (cur?.active) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+
+  await set(vRef, {
+    active: true,
+    phase: 'pick',
+    by: byPlayerId,
+    at: Date.now(),
+    selections: {},
+    results: null,
+    showUntil: null,
+    resolveLock: null,
+    clearLock: null
+  });
+}
+
+async function pickVote7Target(targetId){
+  if (!state.roomCode) return;
+  const v = getVote7();
+  if (!v?.active) return;
+  if (v.phase !== 'pick') return;
+  if (!targetId || targetId === state.userId) return;
+  if (v?.selections?.[state.userId]?.targetId) return;
+
+  await set(ref(db, `rooms/${state.roomCode}/vote7/selections/${state.userId}`), {
+    targetId,
+    at: Date.now()
+  });
+
+  await maybeResolveVote7();
+}
+
+async function maybeResolveVote7(){
+  if (!state.roomCode) return;
+  const v = getVote7();
+  if (!v?.active || v.phase !== 'pick') return;
+
+  const players = await getSeatedPlayers();
+  if (!players.length) return;
+
+  const selections = v.selections || {};
+  const pickedCount = players.filter(p => selections[p.id]?.targetId).length;
+  if (pickedCount !== players.length) return;
+
+  const lockRef = ref(db, `rooms/${state.roomCode}/vote7/resolveLock`);
+  const myId = state.userId;
+
+  const locked = await runTransaction(lockRef, (val) => {
+    if (val && val.by && val.at && (Date.now() - val.at) < 15000) return;
+    return { by: myId, at: Date.now() };
+  }, { applyLocally:false });
+
+  if (!locked.committed) return;
+
+  try{
+    const results = buildVote7Results(selections, players);
+    await update(ref(db, `rooms/${state.roomCode}/vote7`), {
+      phase: 'result',
+      results,
+      showUntil: Date.now() + VOTE7_RESULT_MS,
+      updatedAt: Date.now()
+    });
+  } finally {
+    await set(ref(db, `rooms/${state.roomCode}/vote7/resolveLock`), null);
+  }
+}
+
+async function maybeFinalizeVote7(){
+  if (!state.roomCode) return;
+  const v = getVote7();
+  if (!v?.active || v.phase !== 'result') return;
+
+  const showUntil = Number(v.showUntil || 0);
+  if (!showUntil || Date.now() < showUntil) return;
+
+  const lockRef = ref(db, `rooms/${state.roomCode}/vote7/clearLock`);
+  const myId = state.userId;
+  const locked = await runTransaction(lockRef, (val) => {
+    if (val && val.by && val.at && (Date.now() - val.at) < 15000) return;
+    return { by: myId, at: Date.now() };
+  }, { applyLocally:false });
+  if (!locked.committed) return;
+
+  try{
+    const updates = {};
+    updates[`rooms/${state.roomCode}/vote7`] = null;
+    updates[`rooms/${state.roomCode}/turn/paused`] = false;
+    await update(ref(db, `/`), updates);
+    state.vote7 = null;
+    await advanceTurnToNextPlayer();
+  } finally {
+    // no-op: node removed
+  }
+}
+
+function updateVote7ResultUI(){
+  const v = getVote7();
+  if (!v?.active || v.phase !== 'result'){
+    vote7ResultEl.classList.add('hidden');
+    vote7ResultEl.innerHTML = '';
+    return;
+  }
+
+  const results = Array.isArray(v.results) ? v.results : [];
+  const players = latestPlayers || [];
+  const nameMap = new Map(players.map(p => [p.id, p.name]));
+
+  if (!results.length){
+    vote7ResultEl.classList.add('hidden');
+    vote7ResultEl.innerHTML = '';
+    return;
+  }
+
+  vote7ResultEl.innerHTML = results.map((row) => {
+    const targetName = nameMap.get(row.targetId) || '名無し';
+    const voters = Array.isArray(row.voters) ? row.voters : [];
+    const voterTags = voters.map((vid) => {
+      const name = nameMap.get(vid) || '名無し';
+      return `<span class="vote7-tag">${name}</span>`;
+    }).join(' ');
+
+    return `
+      <div class="vote7-line">
+        <span class="vote7-tag">${targetName}</span>
+        <span class="vote7-arrow">👈</span>
+        ${voterTags}
+      </div>
+    `;
+  }).join('');
+
+  vote7ResultEl.classList.remove('hidden');
+}
+
+/* =========================
    自分の手札レンダリング
    ========================= */
 function renderMyHand(){
@@ -2452,6 +2715,7 @@ function renderHands(){
   if (latestPlayers.length) renderPlayerCircle(latestPlayers);
   updateDeckUI();
   renderDiscardCenter();
+  updateVote7ResultUI();
 }
 
 /* =========================
@@ -2467,6 +2731,7 @@ async function maybeAutoDrawAtTurnStart(){
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
   if (isWitnessActive()) return;
+  if (isVote7Active()) return;
 
   autoDrawInFlight = true;
   const turnRef = ref(db, `rooms/${state.roomCode}/turn`);
@@ -2892,6 +3157,11 @@ async function playCardFromHand(cardIndex){
     return;
   }
 
+  if (used === "7"){
+    await startVote7(myId);
+    return;
+  }
+
   await resolveCardEffectPlaceholder(used);
   await advanceTurnToNextPlayer();
 }
@@ -2916,6 +3186,7 @@ async function advanceTurnToNextPlayer(){
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
   if (isWitnessActive()) return;
+  if (isVote7Active()) return;
 
   const players = await getSeatedPlayers();
   if (!players.length) return;
@@ -2990,6 +3261,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeSurveillance6();
   // ★ 5（証人）
   subscribeWitness5();
+  // ★ 7（投票）
+  subscribeVote7();
 
   syncSeatUI();
 });
@@ -3139,6 +3412,16 @@ function renderPlayerCircle(players){
   const wi = getWitness5();
   const iAmWitnessBy = !!(wiActive && wi?.by === state.userId && wi?.phase === 'pickTarget');
 
+  const vActive = isVote7Active();
+  const v = getVote7();
+  const vSelections = v?.selections || {};
+  const myVoteTarget = vSelections?.[state.userId]?.targetId || null;
+  const canVoteNow = !!(vActive && v?.phase === 'pick' && !myVoteTarget);
+  const voteTargetedSet = new Set();
+  Object.values(vSelections || {}).forEach((sel) => {
+    if (sel && sel.targetId) voteTargetedSet.add(sel.targetId);
+  });
+
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
     const angle = anchorAngle + step * k;
@@ -3189,6 +3472,23 @@ function renderPlayerCircle(players){
     */
     if (iAmWitnessBy && p.id !== state.userId){
       tag.classList.add('witness5-targetable');
+    }
+
+    /* ★ 7（投票）：全員が他プレイヤーを選択 */
+    if (vActive){
+      const voterPick = vSelections?.[p.id]?.targetId || null;
+      if (voterPick){
+        tag.classList.add('vote7-picked');
+      }
+      if (voteTargetedSet.has(p.id)){
+        tag.classList.add('vote7-picked');
+      }
+    }
+    if (canVoteNow && p.id !== state.userId){
+      tag.classList.add('vote7-targetable');
+      tag.addEventListener('click', async () => {
+        await pickVote7Target(p.id);
+      });
     }
 
     const handData = state.hands[p.id];
@@ -3410,6 +3710,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/exchangeEvent`), null),
     set(ref(db, `rooms/${state.roomCode}/surveillance6`), null),
     set(ref(db, `rooms/${state.roomCode}/witness5`), null),
+    set(ref(db, `rooms/${state.roomCode}/vote7`), null),
   ]);
 
   if (initialDrawDisp){
@@ -3448,6 +3749,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/exchangeEvent`)),
     remove(ref(db, `${base}/surveillance6`)),
     remove(ref(db, `${base}/witness5`)),
+    remove(ref(db, `${base}/vote7`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
