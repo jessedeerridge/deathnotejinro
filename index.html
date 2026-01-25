@@ -684,6 +684,9 @@
     pointer-events:none;
   }
   .judgement-fade.active{ opacity:0.96; }
+  body.kira-judgement-foreground .judgement-fade{
+    z-index:12004;
+  }
   .judgement-message{
     position:fixed;
     left:50%;
@@ -3273,6 +3276,7 @@ function syncJudgementUI(){
   );
 
   playerCircle.classList.toggle('judgement-kira-active', isKiraSelectionPhase);
+  document.body.classList.toggle('kira-judgement-foreground', isKiraSelectionPhase);
 
   if (!hasActive){
     setJudgementFade(false);
