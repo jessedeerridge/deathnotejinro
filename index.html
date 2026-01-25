@@ -508,8 +508,8 @@
     pointer-events:none;
     z-index:55;
     transform:translate(calc(-50% - 40px), 0);
-    animation: eliminatedIdSlide 360ms ease-out forwards;
-    animation-delay:1200ms;
+    animation: eliminatedIdSlide 300ms ease-out forwards;
+    animation-delay:200ms;
   }
   .eliminated-identity-card.settled{
     animation:none;
@@ -1423,7 +1423,11 @@ let judgementLastPoint = null;
 let judgementHasStroke = false;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
+let lastJudgementRoundLocal = 0;
 let lastJudgementNoZeroAt = null;
+const ELIMINATED_ID_SLIDE_DELAY_MS = 200;
+const ELIMINATED_ID_SLIDE_TOTAL_MS = 500;
+const ELIMINATED_POST_SLIDE_DEAL_DELAY_MS = 500;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -2012,6 +2016,10 @@ function subscribeRoom(){
   const roomRef = ref(db, `rooms/${state.roomCode}`);
   onValue(roomRef, snap => {
     state.room = snap.val() || {};
+    const reportedRound = Number(state.room?.judgementMeta?.lastRound || 0);
+    if (reportedRound > lastJudgementRoundLocal){
+      lastJudgementRoundLocal = reportedRound;
+    }
     const waiting = (!state.isHost && !state.room.maxPlayers);
     hostSelectingPop.classList.toggle('hidden', !waiting);
     syncSeatUI();
@@ -3400,6 +3408,7 @@ async function startJudgementSequence(players, round){
       lastRound: Number(round || 0),
       updatedAt: Date.now()
     });
+    lastJudgementRoundLocal = Math.max(lastJudgementRoundLocal, Number(round || 0));
 
     if (!kiraHasZero){
       // handled by syncJudgementUI timing
@@ -3472,6 +3481,7 @@ async function executeJudgementElimination(targetId){
     discardedAt: Date.now(),
     discardToken: null
   });
+  await sleep(ELIMINATED_POST_SLIDE_DEAL_DELAY_MS);
 }
 
 async function discardHandSequentially(targetId, byId){
@@ -4373,7 +4383,10 @@ async function advanceTurnToNextPlayer(){
 
   const isLastPlayer = (idx === activePlayers.length - 1);
   const round = getCurrentRound(activePlayers.length);
-  const lastRoundTriggered = Number(state.room?.judgementMeta?.lastRound || 0);
+  const lastRoundTriggered = Math.max(
+    lastJudgementRoundLocal,
+    Number(state.room?.judgementMeta?.lastRound || 0)
+  );
   if (isLastPlayer && round >= 2 && round > lastRoundTriggered){
     await startJudgementSequence(activePlayers, round);
     return;
@@ -4748,10 +4761,10 @@ function renderPlayerCircle(players){
       idSlide.className = 'eliminated-identity-card';
       idSlide.textContent = eliminatedIdentity;
       const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
-      if (Number.isFinite(elapsed) && elapsed >= 1200){
+      if (Number.isFinite(elapsed) && elapsed >= ELIMINATED_ID_SLIDE_TOTAL_MS){
         idSlide.classList.add('settled');
       } else if (Number.isFinite(elapsed)){
-        idSlide.style.animationDelay = `${Math.max(0, 1200 - elapsed)}ms`;
+        idSlide.style.animationDelay = `${Math.max(0, ELIMINATED_ID_SLIDE_DELAY_MS - elapsed)}ms`;
       }
       tag.appendChild(idSlide);
     }
