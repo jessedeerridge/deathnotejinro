@@ -450,6 +450,28 @@
     /* mini-hand(60px幅)の左外に半分出す感じ */
     margin-left:-40px;
   }
+  .judgement-id-face{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.45);
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    font-size:10px;
+    font-weight:900;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index:55;
+  }
+  .player-tag .judgement-id-face{
+    margin-left:-40px;
+  }
 
   .witness-layer{
     position:absolute;
@@ -1205,6 +1227,7 @@ const state = {
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
   judgement: null,     // ★ 裁き
+  eliminated: {},      // ★ 脱落
 };
 
 const mainEl = document.getElementById('main');
@@ -1432,11 +1455,13 @@ function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' |
 function isPolice(){ const id = getMyIdentity(); return id === '警察1' || id === '警察2'; }
 function isJudgementActive(){ return !!state.judgement?.active; }
 function getJudgement(){ return (state.judgement && typeof state.judgement === 'object') ? state.judgement : null; }
+function isEliminated(playerId){ return !!state.eliminated?.[playerId]; }
 
 function calcIsPlayable(){
   const myId = state.userId;
   const hand = state.hands[myId];
   const count = Array.isArray(hand?.cards) ? hand.cards.length : 0;
+  if (isEliminated(myId)) return false;
 
   const invActive = isInvestigationActive();
   const exActive  = isExchangeActive();
@@ -1978,6 +2003,14 @@ function subscribeDiscard(){
   onValue(dRef, snap => {
     state.discard = snap.val() || [];
     renderDiscardCenter();
+  });
+}
+
+function subscribeEliminated(){
+  const elimRef = ref(db, `rooms/${state.roomCode}/eliminated`);
+  onValue(elimRef, snap => {
+    state.eliminated = snap.val() || {};
+    renderHands();
   });
 }
 
@@ -3339,12 +3372,80 @@ async function pickJudgementTarget(targetId){
   });
 }
 
+async function executeJudgementElimination(targetId){
+  if (!state.roomCode) return;
+  if (!targetId) return;
+  const identity = state.hands?.[targetId]?.identity || '？';
+  const token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const elimRef = ref(db, `rooms/${state.roomCode}/eliminated/${targetId}`);
+
+  const res = await runTransaction(elimRef, (cur) => {
+    if (cur?.discardedAt) return cur;
+    if (cur?.discardToken) return cur;
+    if (cur){
+      return {
+        ...cur,
+        identity: cur.identity || identity,
+        discardToken: token,
+        by: cur.by || state.userId,
+        at: cur.at || Date.now(),
+        source: cur.source || 'judgement'
+      };
+    }
+    return {
+      by: state.userId,
+      at: Date.now(),
+      source: 'judgement',
+      identity,
+      discardToken: token
+    };
+  }, { applyLocally:false });
+
+  const record = res.snapshot.val();
+  if (!record || record.discardToken !== token) return;
+
+  await discardHandSequentially(targetId, state.userId);
+  await update(elimRef, {
+    discardedAt: Date.now(),
+    discardToken: null
+  });
+}
+
+async function discardHandSequentially(targetId, byId){
+  const cardsRef = ref(db, `rooms/${state.roomCode}/hands/${targetId}/cards`);
+  const discardRef = ref(db, `rooms/${state.roomCode}/discard`);
+
+  while (true){
+    const snap = await get(cardsRef);
+    const cards = snap.val();
+    const list = Array.isArray(cards) ? cards : [];
+    if (!list.length) break;
+    const cardValue = String(list[0]);
+
+    await runTransaction(cardsRef, (cur) => {
+      const arr = Array.isArray(cur) ? [...cur] : [];
+      if (!arr.length) return arr;
+      arr.shift();
+      return arr;
+    }, { applyLocally:false });
+
+    await runTransaction(discardRef, (cur) => {
+      const arr = Array.isArray(cur) ? [...cur] : [];
+      arr.push({ by: byId, card: cardValue, at: Date.now(), reason: 'judgement' });
+      return arr;
+    }, { applyLocally:false });
+
+    await sleep(1000);
+  }
+}
+
 btnJudgementWriteYes?.addEventListener('click', async (e) => {
   e.preventDefault();
   const j = getJudgement();
   if (!j?.active || j.phase !== 'writing') return;
   if (j.kiraId !== state.userId) return;
   if (!judgementHasStroke) return;
+  const targetId = j.targetId;
   const noteImage = judgementCanvas ? judgementCanvas.toDataURL('image/png') : null;
 
   await update(ref(db, `rooms/${state.roomCode}/judgement`), {
@@ -3353,6 +3454,9 @@ btnJudgementWriteYes?.addEventListener('click', async (e) => {
     noteImage,
     revealedAt: Date.now()
   });
+  if (targetId){
+    executeJudgementElimination(targetId).catch(console.warn);
+  }
 });
 
 function bindJudgementCanvas(){
@@ -3646,6 +3750,10 @@ async function maybeAutoDrawAtTurnStart(){
   if (autoDrawInFlight) return;
   if (state.turn.drawn) return;
   if (state.turn.paused) return;
+  if (isEliminated(state.userId)){
+    await advanceTurnToNextPlayer();
+    return;
+  }
   if (isInvestigationActive()) return;
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
@@ -4123,17 +4231,18 @@ async function advanceTurnToNextPlayer(){
   if (isGun2Active()) return;
 
   const players = await getSeatedPlayers();
-  if (!players.length) return;
+  const activePlayers = players.filter(p => !isEliminated(p.id));
+  if (!activePlayers.length) return;
 
-  const currentId = state.turn.currentPlayerId || players[0].id;
-  const idx = players.findIndex(p => p.id === currentId);
-  const next = players[(idx >= 0 ? idx + 1 : 0) % players.length];
+  const currentId = state.turn.currentPlayerId || activePlayers[0].id;
+  const idx = activePlayers.findIndex(p => p.id === currentId);
+  const next = activePlayers[(idx >= 0 ? idx + 1 : 0) % activePlayers.length];
 
-  const isLastPlayer = (idx === players.length - 1);
-  const round = getCurrentRound(players.length);
+  const isLastPlayer = (idx === activePlayers.length - 1);
+  const round = getCurrentRound(activePlayers.length);
   const lastRoundTriggered = Number(state.room?.judgementMeta?.lastRound || 0);
   if (isLastPlayer && round >= 2 && round > lastRoundTriggered){
-    await startJudgementSequence(players, round);
+    await startJudgementSequence(activePlayers, round);
     return;
   }
 
@@ -4189,6 +4298,7 @@ btnJoin.addEventListener('click', async () => {
   subscribeHands();
   subscribeDeck();
   subscribeDiscard();
+  subscribeEliminated();
   subscribeTurn();
   subscribeDrawEvent();
   subscribeReshuffleEvent();
@@ -4474,6 +4584,8 @@ function renderPlayerCircle(players){
     }
 
     const handData = state.hands[p.id];
+    const eliminated = isEliminated(p.id);
+    const eliminatedIdentity = state.eliminated?.[p.id]?.identity || handData?.identity || '？';
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     let gun2RevealIdx = null;
@@ -4499,6 +4611,13 @@ function renderPlayerCircle(players){
       const miniCircle = document.createElement('div');
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
+
+      if (eliminated){
+        const idFace = document.createElement('div');
+        idFace.className = 'judgement-id-face';
+        idFace.textContent = eliminatedIdentity;
+        miniHand.appendChild(idFace);
+      }
 
       // ★ 5：使用者だけ、左に正体カード裏を置く（mini-handの中に置く）
       if (iAmWitnessBy){
@@ -4586,6 +4705,17 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
+        tag.appendChild(miniHand);
+      } else if (eliminated && p.id !== state.userId){
+        const miniHand = document.createElement('div');
+        miniHand.className = 'mini-hand';
+        const miniCircle = document.createElement('div');
+        miniCircle.className = 'mini-hand-circle';
+        miniHand.appendChild(miniCircle);
+        const idFace = document.createElement('div');
+        idFace.className = 'judgement-id-face';
+        idFace.textContent = eliminatedIdentity;
+        miniHand.appendChild(idFace);
         tag.appendChild(miniHand);
       } else if (iAmGun2By && p.id !== state.userId){
         const miniHand = document.createElement('div');
@@ -4759,6 +4889,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/hands`), hands),
     set(ref(db, `rooms/${state.roomCode}/deck`), deckRaw.map(String)),
     set(ref(db, `rooms/${state.roomCode}/discard`), []),
+    set(ref(db, `rooms/${state.roomCode}/eliminated`), null),
     set(ref(db, `rooms/${state.roomCode}/turn`), { currentPlayerId:firstPlayerId, turnSeq:1, drawn:true, paused:false, updatedAt:Date.now() }),
     set(ref(db, `rooms/${state.roomCode}/investigation`), null),
     set(ref(db, `rooms/${state.roomCode}/transferEvent`), null),
@@ -4800,6 +4931,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/hands`)),
     remove(ref(db, `${base}/deck`)),
     remove(ref(db, `${base}/discard`)),
+    remove(ref(db, `${base}/eliminated`)),
     remove(ref(db, `${base}/turn`)),
     remove(ref(db, `${base}/drawEvent`)),
     remove(ref(db, `${base}/reshuffleEvent`)),
