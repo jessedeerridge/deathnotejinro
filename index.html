@@ -1423,6 +1423,7 @@ let judgementLastPoint = null;
 let judgementHasStroke = false;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
+let lastJudgementRoundLocal = 0;
 let lastJudgementNoZeroAt = null;
 
 function generateRoomCode(length = 6){
@@ -2012,6 +2013,10 @@ function subscribeRoom(){
   const roomRef = ref(db, `rooms/${state.roomCode}`);
   onValue(roomRef, snap => {
     state.room = snap.val() || {};
+    const reportedRound = Number(state.room?.judgementMeta?.lastRound || 0);
+    if (reportedRound > lastJudgementRoundLocal){
+      lastJudgementRoundLocal = reportedRound;
+    }
     const waiting = (!state.isHost && !state.room.maxPlayers);
     hostSelectingPop.classList.toggle('hidden', !waiting);
     syncSeatUI();
@@ -3400,6 +3405,7 @@ async function startJudgementSequence(players, round){
       lastRound: Number(round || 0),
       updatedAt: Date.now()
     });
+    lastJudgementRoundLocal = Math.max(lastJudgementRoundLocal, Number(round || 0));
 
     if (!kiraHasZero){
       // handled by syncJudgementUI timing
@@ -4373,7 +4379,10 @@ async function advanceTurnToNextPlayer(){
 
   const isLastPlayer = (idx === activePlayers.length - 1);
   const round = getCurrentRound(activePlayers.length);
-  const lastRoundTriggered = Number(state.room?.judgementMeta?.lastRound || 0);
+  const lastRoundTriggered = Math.max(
+    lastJudgementRoundLocal,
+    Number(state.room?.judgementMeta?.lastRound || 0)
+  );
   if (isLastPlayer && round >= 2 && round > lastRoundTriggered){
     await startJudgementSequence(activePlayers, round);
     return;
