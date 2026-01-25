@@ -7,7 +7,7 @@
 <style>
   html, body{height:100%; overflow:hidden;}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff;color:#111;}
-  header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee; position:sticky; top:0; z-index:400; background:#fff;}
+  header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee; position:sticky; top:0; z-index:40; background:#fff;}
   h1{margin:0;font-size:18px;}
   .small{font-size:12px;opacity:.75;}
   .join-box{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:12px; position:relative; z-index:2;}
@@ -35,7 +35,7 @@
     position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
     background:orange;border:1px solid #eee;border-radius:12px;
     box-shadow:0 12px 28px rgba(0,0,0,.12);
-    padding:10px;z-index:220;display:flex;flex-direction:column;gap:10px;min-width:280px;
+    padding:10px;z-index:60;display:flex;flex-direction:column;gap:10px;min-width:280px;
   }
   .seat-pop.hidden{display:none;}
   .seat-pop .row{display:flex;gap:8px;align-items:center;}
@@ -51,7 +51,7 @@
     background:rgba(20,20,20,.92);color:#fff;
     padding:12px 16px;border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
-    z-index:225;font-weight:800;white-space:nowrap;
+    z-index:61;font-weight:800;white-space:nowrap;
     pointer-events:none;
   }
   .host-selecting-pop.hidden{display:none;}
@@ -98,7 +98,7 @@
     left:50%; top:50%;
     transform:translate(-50%,-50%);
     width:0; height:0;
-    z-index:6;
+    z-index:11;
     pointer-events:none;
   }
   .discard-card{
@@ -125,7 +125,7 @@
     font-size:22px;font-weight:800;
     box-shadow:0 18px 40px rgba(0,0,0,.28);
     pointer-events:none;
-    z-index:9996;
+    z-index:92;
     transform:translate(-50%,-50%);
     opacity:1;
   }
@@ -140,7 +140,7 @@
     border:1px solid #bbb;
     background:linear-gradient(135deg,#e5e7eb,#cbd5f5);
     box-shadow:0 6px 16px rgba(0,0,0,.18);
-    z-index:7;
+    z-index:12;
     user-select:none;
   }
   .deck-count{
@@ -166,7 +166,7 @@
     background:linear-gradient(135deg,#e5e7eb,#cbd5f5);
     box-shadow:0 18px 40px rgba(0,0,0,.28);
     pointer-events:none;
-    z-index:9998;
+    z-index:93;
     transform:translate(-50%,-50%);
     opacity:1;
   }
@@ -179,7 +179,7 @@
     background:linear-gradient(135deg,#e5e7eb,#cbd5f5);
     box-shadow:0 18px 40px rgba(0,0,0,.28);
     pointer-events:none;
-    z-index:9997;
+    z-index:91;
     transform:translate(-50%,-50%);
     opacity:1;
   }
@@ -192,7 +192,7 @@
     background:linear-gradient(135deg,#e5e7eb,#cbd5f5);
     box-shadow:0 18px 40px rgba(0,0,0,.30);
     pointer-events:none;
-    z-index:9999;
+    z-index:94;
     transform:translate(-50%,-50%);
     opacity:1;
   }
@@ -205,7 +205,7 @@
     background:linear-gradient(135deg,#e5e7eb,#cbd5f5);
     box-shadow:0 18px 40px rgba(0,0,0,.32);
     pointer-events:none;
-    z-index:10000;
+    z-index:95;
     transform:translate(-50%,-50%);
     opacity:1;
   }
@@ -381,7 +381,7 @@
   .watch-backdrop{
     position:fixed; inset:0;
     background:transparent;
-    z-index:12000;
+    z-index:80;
     display:block;
     pointer-events:auto;
   }
@@ -419,7 +419,7 @@
     border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
     padding:10px 12px;
-    z-index:12001;
+    z-index:81;
     display:flex;
     align-items:center;
     gap:10px;
@@ -456,7 +456,7 @@
     transform:translate(-50%,0);
     cursor:pointer;
     pointer-events:auto;
-    z-index:50;
+    z-index:40;
     animation: witnessIdPulse 760ms ease-in-out infinite;
   }
   /* 「扇手札の左」に見せるため、mini-handの左端に寄せる */
@@ -481,7 +481,7 @@
     align-items:center;
     justify-content:center;
     pointer-events:none;
-    z-index:55;
+    z-index:41;
   }
   .player-tag .judgement-id-face{
     margin-left:-40px;
@@ -506,7 +506,7 @@
     align-items:center;
     justify-content:center;
     pointer-events:none;
-    z-index:55;
+    z-index:41;
     transform:translate(calc(-50% - 40px), 0);
     animation: eliminatedIdSlide 360ms ease-out forwards;
     animation-delay:1200ms;
@@ -528,7 +528,7 @@
   .witness-backdrop{
     position:fixed; inset:0;
     background:transparent;
-    z-index:12020;
+    z-index:82;
     display:block;
     pointer-events:auto;
   }
@@ -565,7 +565,7 @@
     border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
     padding:10px 12px;
-    z-index:12021;
+    z-index:83;
     display:flex;
     align-items:center;
     gap:10px;
@@ -610,7 +610,7 @@
     border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
     padding:10px 12px;
-    z-index:12040;
+    z-index:84;
     display:flex;
     align-items:center;
     gap:10px;
@@ -631,7 +631,7 @@
     border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
     padding:10px 12px;
-    z-index:12022;
+    z-index:85;
     display:flex;
     align-items:center;
     gap:10px;
@@ -658,7 +658,7 @@
     border:1px solid rgba(255,255,255,.12);
     border-radius:14px;
     padding:10px 16px;
-    z-index:12010;
+    z-index:76;
     font-weight:900;
     white-space:nowrap;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
@@ -680,13 +680,10 @@
     background:#000;
     opacity:0;
     transition:opacity 1s ease;
-    z-index:12005;
+    z-index:70;
     pointer-events:none;
   }
   .judgement-fade.active{ opacity:0.96; }
-  body.kira-judgement-foreground .judgement-fade{
-    z-index:12004;
-  }
   .judgement-message{
     position:fixed;
     left:50%;
@@ -700,7 +697,7 @@
     box-shadow:0 18px 40px rgba(0,0,0,.45);
     font-weight:900;
     font-size:16px;
-    z-index:12012;
+    z-index:77;
     pointer-events:none;
     white-space:nowrap;
   }
@@ -716,12 +713,6 @@
     animation: judgementTagPulse 820ms ease-in-out infinite;
     box-shadow:0 0 0 2px rgba(17,17,17,.12);
   }
-  .player-circle.judgement-kira-active{
-    z-index:12006;
-  }
-  .player-circle.judgement-kira-active .player-tag{
-    z-index:12006;
-  }
   .player-tag.judgement-self-hidden{
     opacity:0;
     pointer-events:none;
@@ -736,7 +727,7 @@
     height:170px;
     display:flex;
     gap:0;
-    z-index:12015;
+    z-index:78;
     pointer-events:auto;
     transition:width 0.4s ease, transform 0.4s ease;
   }
@@ -777,7 +768,7 @@
     border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
     padding:10px 12px;
-    z-index:12022;
+    z-index:79;
     display:flex;
     align-items:center;
     gap:10px;
@@ -857,7 +848,7 @@
     display:flex;align-items:center;justify-content:center;
     font-size:24px;font-weight:700;
     pointer-events:none;
-    z-index:9999;
+    z-index:96;
     transform:translate(-50%,-50%);
   }
 
@@ -881,7 +872,7 @@
 
   .dialog-backdrop{
     position:fixed;inset:0;background:rgba(0,0,0,.35);
-    display:flex;align-items:center;justify-content:center;z-index:300;
+    display:flex;align-items:center;justify-content:center;z-index:85;
   }
   .dialog-backdrop.hidden{display:none;}
   .dialog-box{
@@ -895,13 +886,13 @@
   .host-settings-btn{
     position:fixed;right:16px;bottom:16px;width:44px;height:44px;border-radius:50%;
     border:1px solid #ddd;background:#fff;box-shadow:0 8px 20px rgba(0,0,0,.18);
-    display:none;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:230;
+    display:none;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:55;
   }
   .host-settings-btn.visible{display:flex;}
 
   .start-pop{
     position:fixed;right:16px;bottom:72px;background:#fff;border:1px solid #ddd;border-radius:12px;
-    box-shadow:0 12px 28px rgba(0,0,0,.16);padding:10px 12px;z-index:240;min-width:260px;
+    box-shadow:0 12px 28px rgba(0,0,0,.16);padding:10px 12px;z-index:56;min-width:260px;
     display:flex;flex-direction:column;gap:8px;
   }
   .start-pop.hidden{display:none;}
@@ -921,14 +912,14 @@
     border:1px solid #111;background:#111;color:#fff;
     box-shadow:0 8px 20px rgba(0,0,0,.18);
     display:none;align-items:center;justify-content:center;
-    font-size:22px;font-weight:800;cursor:pointer;z-index:230;
+    font-size:22px;font-weight:800;cursor:pointer;z-index:55;
   }
   .help-btn.visible{display:flex;}
 
   .help-pop-backdrop{
     position:fixed;inset:0;background:rgba(0,0,0,.35);
     display:flex;align-items:flex-end;justify-content:center;
-    z-index:310;
+    z-index:86;
     padding:16px;
   }
   .help-pop-backdrop.hidden{display:none;}
@@ -963,7 +954,7 @@
     background:rgba(20,20,20,.92);color:#fff;
     padding:10px 12px;border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
-    z-index:260;
+    z-index:65;
     font-weight:900;
     white-space:nowrap;
     pointer-events:none;
@@ -977,7 +968,7 @@
     background:rgba(20,20,20,.92);color:#fff;
     padding:10px 12px;border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
-    z-index:261;
+    z-index:66;
     font-weight:900;
     white-space:nowrap;
     pointer-events:none;
@@ -992,7 +983,7 @@
     background:rgba(20,20,20,.92);color:#fff;
     padding:10px 12px;border-radius:14px;
     box-shadow:0 18px 40px rgba(0,0,0,.35);
-    z-index:262;
+    z-index:67;
     font-weight:900;
     white-space:nowrap;
     pointer-events:none;
@@ -1009,7 +1000,7 @@
     padding:10px 12px;
     border-radius:12px;
     box-shadow:0 14px 32px rgba(0,0,0,.35);
-    z-index:260;
+    z-index:65;
     font-weight:700;
     white-space:nowrap;
     border:1px solid rgba(255,255,255,.08);
@@ -1373,6 +1364,8 @@ const judgementCanvas = document.getElementById('judgementCanvas');
 const judgementTargetPop = document.getElementById('judgementTargetPop');
 const judgementTargetMessage = document.getElementById('judgementTargetMessage');
 const judgementWritePop = document.getElementById('judgementWritePop');
+const judgementFadeHome = judgementFade?.parentElement || null;
+const judgementFadeNextSibling = judgementFade?.nextSibling || null;
 const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 
 /* ===== カード説明 ===== */
@@ -1439,6 +1432,7 @@ let judgementCountdownTimer = null;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
+let judgementFadeInMain = false;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -2349,7 +2343,7 @@ function renderDiscardCenter(){
     const lift = i * 0.6;
 
     card.style.transform = `translate(-50%,-50%) translate(${dx}px, ${dy - lift}px) rotate(${rot}deg)`;
-    card.style.zIndex = String(100 + i);
+    card.style.zIndex = String(20 + i);
     discardStackEl.appendChild(card);
   });
 }
@@ -3265,6 +3259,24 @@ function openJudgementNotebook(enableDraw){
   judgementDrawActive = !!enableDraw;
 }
 
+function placeJudgementFadeInMain(inMain){
+  if (!judgementFade || !mainEl || !judgementFadeHome) return;
+  if (inMain){
+    if (judgementFade.parentElement !== mainEl){
+      mainEl.insertBefore(judgementFade, mainEl.firstChild);
+    }
+    judgementFadeInMain = true;
+    return;
+  }
+  if (!judgementFadeInMain) return;
+  if (judgementFadeNextSibling){
+    judgementFadeHome.insertBefore(judgementFade, judgementFadeNextSibling);
+  } else {
+    judgementFadeHome.appendChild(judgementFade);
+  }
+  judgementFadeInMain = false;
+}
+
 function syncJudgementUI(){
   const j = getJudgement();
   const hasActive = !!j?.active;
@@ -3276,7 +3288,7 @@ function syncJudgementUI(){
   );
 
   playerCircle.classList.toggle('judgement-kira-active', isKiraSelectionPhase);
-  document.body.classList.toggle('kira-judgement-foreground', isKiraSelectionPhase);
+  placeJudgementFadeInMain(isKiraSelectionPhase);
 
   if (!hasActive){
     setJudgementFade(false);
@@ -4950,12 +4962,12 @@ function renderPlayerCircle(players){
           card.classList.add('shinigami-face');
           card.textContent = '0';
           card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
-          card.style.zIndex = String(200 + idx2);
+          card.style.zIndex = String(40 + idx2);
         } else if (showGun2Reveal && Number.isFinite(Number(gun2RevealIdx)) && idx2 === Number(gun2RevealIdx)){
           card.classList.add('gun2-face');
           card.textContent = gun2RevealCard ?? '';
           card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
-          card.style.zIndex = String(200 + idx2);
+          card.style.zIndex = String(40 + idx2);
         }
 
         miniHand.appendChild(card);
