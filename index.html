@@ -482,9 +482,18 @@
     justify-content:center;
     pointer-events:none;
     z-index:55;
+    opacity:0;
+    transform:translate(-50%,-6px);
   }
   .player-tag .judgement-id-face{
     margin-left:-40px;
+  }
+  .judgement-id-face.reveal-slide{
+    animation: eliminatedRevealSlide 420ms ease-out forwards;
+  }
+  @keyframes eliminatedRevealSlide{
+    0%{ opacity:0; transform:translate(-50%,-6px); }
+    100%{ opacity:1; transform:translate(-50%,8px); }
   }
 
   .witness-layer{
@@ -1395,6 +1404,8 @@ let judgementHasStroke = false;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
+const eliminatedRevealReady = {};
+const eliminatedRevealTimers = {};
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -2039,6 +2050,27 @@ function subscribeEliminated(){
   const elimRef = ref(db, `rooms/${state.roomCode}/eliminated`);
   onValue(elimRef, snap => {
     state.eliminated = snap.val() || {};
+    Object.keys(eliminatedRevealReady).forEach((pid) => {
+      if (!state.eliminated?.[pid]){
+        delete eliminatedRevealReady[pid];
+      }
+    });
+    Object.keys(eliminatedRevealTimers).forEach((pid) => {
+      if (!state.eliminated?.[pid]){
+        clearTimeout(eliminatedRevealTimers[pid]);
+        delete eliminatedRevealTimers[pid];
+      }
+    });
+    Object.entries(state.eliminated).forEach(([pid, info]) => {
+      const discardedAt = Number(info?.discardedAt || 0);
+      if (!discardedAt || eliminatedRevealReady[pid] || eliminatedRevealTimers[pid]) return;
+      const delay = Math.max(0, discardedAt + 1200 - Date.now());
+      eliminatedRevealTimers[pid] = setTimeout(() => {
+        eliminatedRevealReady[pid] = true;
+        delete eliminatedRevealTimers[pid];
+        renderPlayerCircle(latestPlayers);
+      }, delay);
+    });
     renderHands();
   });
 }
@@ -4719,10 +4751,12 @@ function renderPlayerCircle(players){
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
 
-      if (eliminated){
+      const revealReady = !!eliminatedRevealReady[p.id];
+      if (eliminated && revealReady){
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
         idFace.textContent = eliminatedIdentity;
+        idFace.classList.add('reveal-slide');
         miniHand.appendChild(idFace);
       }
 
@@ -4813,7 +4847,7 @@ function renderPlayerCircle(players){
         });
         miniHand.appendChild(idBack);
         tag.appendChild(miniHand);
-      } else if (eliminated && p.id !== state.userId){
+      } else if (eliminated && p.id !== state.userId && eliminatedRevealReady[p.id]){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
         const miniCircle = document.createElement('div');
@@ -4822,6 +4856,7 @@ function renderPlayerCircle(players){
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
         idFace.textContent = eliminatedIdentity;
+        idFace.classList.add('reveal-slide');
         miniHand.appendChild(idFace);
         tag.appendChild(miniHand);
       } else if (iAmGun2By && p.id !== state.userId){
