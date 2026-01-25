@@ -68,6 +68,7 @@
     border:1px solid #ddd;font-size:12px;white-space:nowrap;
   }
   .player-tag.me{ background:#111;color:#fff;border-color:#111; }
+  .player-tag .player-name{ display:inline-block; }
 
   .center-area{
     position:absolute;
@@ -667,8 +668,10 @@
   }
   .player-tag.judgement-targetable{
     cursor:pointer;
-    animation: judgementTagPulse 820ms ease-in-out infinite;
     box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
+  .player-tag.judgement-targetable .player-name{
+    animation: judgementTagPulse 820ms ease-in-out infinite;
   }
 
   .judgement-notebook{
@@ -1480,10 +1483,11 @@ function calcIsPlayable(){
    ========================= */
 function updateTurnHandEmphasisOnTags(){
   const current = state.turn?.currentPlayerId || null;
+  const isJudgement = isJudgementActive();
   const tags = playerCircle.querySelectorAll('.player-tag');
   tags.forEach(tag => {
     const pid = tag.dataset.pid || '';
-    const should = !!current && pid === current && pid !== state.userId;
+    const should = !!current && pid === current && pid !== state.userId && !isJudgement;
     tag.classList.toggle('turn-hand', should);
   });
 }
@@ -3229,7 +3233,8 @@ function syncJudgementUI(){
 
   if (j.phase === 'select' || j.phase === 'writing'){
     const isActiveKira = isKira() && j.kiraId === state.userId;
-    setJudgementFade(!isActiveKira);
+    const hasRevealed = !!j.revealedAt;
+    setJudgementFade(hasRevealed ? false : !isActiveKira);
     playerCircle.classList.remove('judgement-spotlight');
     if (j.phase === 'writing' && isActiveKira){
       const targetName = state.players?.find((p) => p.id === j.targetId)?.name || '対象プレイヤー';
@@ -3280,6 +3285,7 @@ function syncJudgementUI(){
     }
     if (j.revealedAt && judgementRevealHandledAt !== j.revealedAt){
       judgementRevealHandledAt = j.revealedAt;
+      const revealTargetId = j.targetId || null;
       setTimeout(async () => {
         const latest = getJudgement();
         if (!latest?.active || latest.phase !== 'reveal') return;
@@ -3287,6 +3293,11 @@ function syncJudgementUI(){
         await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
         await advanceTurnToNextPlayer();
       }, 2000);
+      if (revealTargetId){
+        setTimeout(() => {
+          executeJudgementElimination(revealTargetId).catch(console.warn);
+        }, 4000);
+      }
     }
   }
 }
@@ -3454,9 +3465,6 @@ btnJudgementWriteYes?.addEventListener('click', async (e) => {
     noteImage,
     revealedAt: Date.now()
   });
-  if (targetId){
-    executeJudgementElimination(targetId).catch(console.warn);
-  }
 });
 
 function bindJudgementCanvas(){
@@ -4509,10 +4517,13 @@ function renderPlayerCircle(players){
 
     const tag = document.createElement('div');
     tag.className = 'player-tag' + (p.id === state.userId ? ' me' : '');
-    tag.textContent = p.name;
     tag.style.left = `${x}%`;
     tag.style.top  = `${y}%`;
     tag.dataset.pid = p.id;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'player-name';
+    nameSpan.textContent = p.name;
+    tag.appendChild(nameSpan);
 
     if (invActive && invPhase() === 'pickMin'){
       const picked = !!selections?.[p.id] && Number.isFinite(Number(selections?.[p.id]?.idx));
