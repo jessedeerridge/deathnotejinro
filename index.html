@@ -666,12 +666,12 @@
   .judgement-pop.hidden{ display:none; }
   @keyframes judgementSlide{
     0%{ transform:translateX(-40px); left:-320px; }
-    25%{ transform:translateX(0); left:50%; }
-    60%{ transform:translateX(-50%); left:50%; }
+    35%{ transform:translateX(0); left:50%; }
+    65%{ transform:translateX(-50%); left:50%; }
     100%{ transform:translateX(40px); left:110%; }
   }
   .judgement-pop.animate{
-    animation: judgementSlide 2.8s ease-in-out forwards;
+    animation: judgementSlide 3.2s ease-in-out forwards;
   }
 
   .judgement-fade{
@@ -712,6 +712,16 @@
     cursor:pointer;
     animation: judgementTagPulse 820ms ease-in-out infinite;
     box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
+  .player-circle.judgement-kira-active{
+    z-index:12006;
+  }
+  .player-circle.judgement-kira-active .player-tag{
+    z-index:12006;
+  }
+  .player-tag.judgement-self-hidden{
+    opacity:0;
+    pointer-events:none;
   }
 
   .judgement-notebook{
@@ -1421,6 +1431,8 @@ let judgementPopAnimating = false;
 let judgementDrawActive = false;
 let judgementLastPoint = null;
 let judgementHasStroke = false;
+let judgementStrokeCount = 0;
+let judgementCountdownTimer = null;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
@@ -3192,8 +3204,11 @@ btnGun2No?.addEventListener('click', async (e) => {
 /* =========================
    ★ 裁き UI & ロジック
    ========================= */
-function showJudgementPop(){
+function showJudgementPop(message){
   if (!judgementPop || judgementPopAnimating) return;
+  if (message){
+    judgementPop.textContent = message;
+  }
   judgementPopAnimating = true;
   judgementPop.classList.remove('hidden');
   judgementPop.classList.remove('animate');
@@ -3203,7 +3218,7 @@ function showJudgementPop(){
     judgementPop.classList.add('hidden');
     judgementPop.classList.remove('animate');
     judgementPopAnimating = false;
-  }, 2800);
+  }, 3200);
 }
 
 function setJudgementFade(active){
@@ -3212,8 +3227,11 @@ function setJudgementFade(active){
 }
 
 
-function showJudgementMessage(show){
+function showJudgementMessage(show, message){
   if (!judgementMessage) return;
+  if (message){
+    judgementMessage.textContent = message;
+  }
   judgementMessage.classList.toggle('hidden', !show);
 }
 
@@ -3247,6 +3265,10 @@ function openJudgementNotebook(enableDraw){
 function syncJudgementUI(){
   const j = getJudgement();
   const hasActive = !!j?.active;
+  const isActiveKira = !!(hasActive && j.kiraId === state.userId);
+  const isKiraSelectionPhase = isActiveKira && (j.phase === 'select' || j.phase === 'writing');
+
+  playerCircle.classList.toggle('judgement-kira-active', isKiraSelectionPhase);
 
   if (!hasActive){
     setJudgementFade(false);
@@ -3254,8 +3276,13 @@ function syncJudgementUI(){
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
+    judgementStrokeCount = 0;
     judgementLastTargetId = null;
     judgementRevealHandledAt = null;
+    if (judgementCountdownTimer){
+      clearTimeout(judgementCountdownTimer);
+      judgementCountdownTimer = null;
+    }
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
@@ -3263,37 +3290,58 @@ function syncJudgementUI(){
     return;
   }
 
-  if (j.phase === 'intro'){
-    showJudgementPop();
+  if (j.phase !== 'countdown' && judgementCountdownTimer){
+    clearTimeout(judgementCountdownTimer);
+    judgementCountdownTimer = null;
+  }
+
+  if (j.phase === 'countdown'){
+    setJudgementFade(true);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
+    const startedAt = Number(j.countdownStartedAt || j.at || Date.now());
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(0, 3 - Math.floor(elapsed / 1000));
+    if (remaining > 0){
+      showJudgementMessage(true, `${remaining}`);
+      if (judgementCountdownTimer){
+        clearTimeout(judgementCountdownTimer);
+      }
+      judgementCountdownTimer = setTimeout(() => {
+        judgementCountdownTimer = null;
+        syncJudgementUI();
+      }, 200);
+    } else {
+      showJudgementMessage(false);
+      advanceJudgementAfterCountdown().catch(console.warn);
+    }
   }
 
   if (j.phase === 'noZero'){
-    if (j.at && lastJudgementNoZeroAt === j.at) return;
-    lastJudgementNoZeroAt = j.at || Date.now();
     setJudgementFade(true);
     showJudgementMessage(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
+    const triggerAt = Number(j.noZeroAt || j.at || Date.now());
+    if (lastJudgementNoZeroAt === triggerAt) return;
+    lastJudgementNoZeroAt = triggerAt;
+    showJudgementPop('裁きの時間は行われませんでした。');
     setTimeout(() => {
-      showJudgementMessage(true);
-      setTimeout(() => {
-        showJudgementMessage(false);
-        setJudgementFade(false);
-        finishJudgementNoZero().catch(console.warn);
-      }, 1200);
-    }, 5000);
+      setJudgementFade(false);
+      finishJudgementNoZero().catch(console.warn);
+    }, 3200);
   }
 
   if (j.phase === 'select' || j.phase === 'writing'){
-    const isActiveKira = isKira() && j.kiraId === state.userId;
-    const hasRevealed = !!j.revealedAt;
-    setJudgementFade(hasRevealed ? false : !isActiveKira);
-    playerCircle.classList.remove('judgement-spotlight');
+    setJudgementFade(true);
+    showJudgementMessage(false);
     if (j.phase === 'writing' && isActiveKira){
       const targetName = state.players?.find((p) => p.id === j.targetId)?.name || '対象プレイヤー';
       if (judgementLastTargetId !== j.targetId){
         judgementHasStroke = false;
+        judgementStrokeCount = 0;
         showJudgementWritePop(false);
         judgementLastTargetId = j.targetId || null;
         if (judgementCanvas){
@@ -3309,19 +3357,27 @@ function syncJudgementUI(){
       judgementHasStroke = false;
     }
   } else {
-    playerCircle.classList.remove('judgement-spotlight');
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
+    judgementStrokeCount = 0;
     judgementLastTargetId = null;
   }
 
-  if (j.phase === 'writing' && j.kiraId === state.userId){
+  if (j.phase === 'writing' && isActiveKira){
     openJudgementNotebook(true);
   }
 
   if (j.phase === 'reveal' || j.showNote){
-    openJudgementNotebook(false);
+    const revealAt = Number(j.revealedAt || Date.now());
+    const elapsed = Date.now() - revealAt;
+    const shouldShowNote = elapsed < 1000;
+    if (shouldShowNote){
+      openJudgementNotebook(false);
+    } else {
+      judgementNotebook?.classList.add('hidden');
+      judgementNotebook?.classList.remove('open');
+    }
     setJudgementFade(false);
     showJudgementMessage(false);
     showJudgementTargetPop(false);
@@ -3339,17 +3395,7 @@ function syncJudgementUI(){
     }
     if (j.revealedAt && judgementRevealHandledAt !== j.revealedAt){
       judgementRevealHandledAt = j.revealedAt;
-      const revealTargetId = j.targetId || null;
-      setTimeout(async () => {
-        const latest = getJudgement();
-        if (!latest?.active || latest.phase !== 'reveal') return;
-        await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
-        await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
-        if (revealTargetId){
-          await executeJudgementElimination(revealTargetId);
-        }
-        await advanceTurnToNextPlayer();
-      }, 2000);
+      resolveJudgementRevealSequence(j.revealedAt).catch(console.warn);
     }
   }
 }
@@ -3360,18 +3406,26 @@ function getCurrentRound(playerCount){
   return Math.max(1, Math.ceil(seq / playerCount));
 }
 
-async function startJudgementSequence(players, round){
-  if (!state.roomCode) return;
+async function withJudgementLock(action){
+  if (!state.roomCode) return false;
   const lockRef = ref(db, `rooms/${state.roomCode}/judgementLock`);
   const myId = state.userId;
-
   const locked = await runTransaction(lockRef, (v) => {
     if (v && v.by && v.at && (Date.now() - v.at) < 15000) return;
     return { by: myId, at: Date.now() };
   }, { applyLocally:false });
-  if (!locked.committed) return;
-
+  if (!locked.committed) return false;
   try{
+    await action();
+  } finally {
+    await set(lockRef, null);
+  }
+  return true;
+}
+
+async function startJudgementSequence(players, round){
+  if (!state.roomCode) return;
+  const locked = await withJudgementLock(async () => {
     await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
 
     const handsSnap = await get(ref(db, `rooms/${state.roomCode}/hands`));
@@ -3390,9 +3444,11 @@ async function startJudgementSequence(players, round){
     const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
     await set(jRef, {
       active: true,
-      phase: kiraHasZero ? 'select' : 'noZero',
+      phase: 'countdown',
       kiraId,
+      kiraHasZero,
       targetId: null,
+      countdownStartedAt: Date.now(),
       at: Date.now(),
       showNote: false
     });
@@ -3400,25 +3456,61 @@ async function startJudgementSequence(players, round){
       lastRound: Number(round || 0),
       updatedAt: Date.now()
     });
+  });
+  if (!locked) return;
+}
 
-    if (!kiraHasZero){
-      // handled by syncJudgementUI timing
-    }
-  } finally {
-    await set(ref(db, `rooms/${state.roomCode}/judgementLock`), null);
-  }
+async function advanceJudgementAfterCountdown(){
+  if (!state.roomCode) return;
+  const j = getJudgement();
+  if (!j?.active || j.phase !== 'countdown') return;
+  await withJudgementLock(async () => {
+    const jSnap = await get(ref(db, `rooms/${state.roomCode}/judgement`));
+    const latest = jSnap.val();
+    if (!latest?.active || latest.phase !== 'countdown') return;
+    const nextPhase = latest.kiraHasZero ? 'select' : 'noZero';
+    await update(ref(db, `rooms/${state.roomCode}/judgement`), {
+      phase: nextPhase,
+      noZeroAt: nextPhase === 'noZero' ? Date.now() : null,
+      updatedAt: Date.now()
+    });
+  });
 }
 
 async function finishJudgementNoZero(){
   if (!state.roomCode) return;
-  const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
-  const jSnap = await get(jRef);
-  const j = jSnap.val();
-  if (!j?.active || j.phase !== 'noZero') return;
+  await withJudgementLock(async () => {
+    const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
+    const jSnap = await get(jRef);
+    const j = jSnap.val();
+    if (!j?.active || j.phase !== 'noZero') return;
 
-  await set(jRef, null);
-  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
-  await advanceTurnToNextPlayer();
+    await set(jRef, null);
+    await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+    await advanceTurnToNextPlayerWithDraw();
+  });
+}
+
+async function resolveJudgementRevealSequence(revealedAt){
+  if (!state.roomCode) return;
+  const waitMs = Math.max(0, 1200 - (Date.now() - Number(revealedAt || Date.now())));
+  await sleep(waitMs);
+
+  await withJudgementLock(async () => {
+    const latestSnap = await get(ref(db, `rooms/${state.roomCode}/judgement`));
+    const latest = latestSnap.val();
+    if (!latest?.active || latest.phase !== 'reveal') return;
+    if (Number(latest.revealedAt || 0) !== Number(revealedAt || 0)) return;
+
+    if (latest.targetId){
+      await executeJudgementElimination(latest.targetId);
+    }
+
+    await sleep(1200);
+    await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
+    await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+    await advanceTurnToNextPlayerWithDraw();
+  });
 }
 
 async function pickJudgementTarget(targetId){
@@ -3529,6 +3621,13 @@ function bindJudgementCanvas(){
 
   const startDraw = (e) => {
     if (!judgementDrawActive) return;
+    judgementStrokeCount += 1;
+    if (judgementStrokeCount >= 3){
+      judgementHasStroke = true;
+      if (getJudgement()?.phase === 'writing' && getJudgement()?.kiraId === state.userId){
+        showJudgementWritePop(true);
+      }
+    }
     judgementLastPoint = { x: e.offsetX, y: e.offsetY };
   };
   const draw = (e) => {
@@ -3538,12 +3637,6 @@ function bindJudgementCanvas(){
     ctx.lineTo(e.offsetX, e.offsetY);
     ctx.stroke();
     judgementLastPoint = { x: e.offsetX, y: e.offsetY };
-    if (!judgementHasStroke){
-      judgementHasStroke = true;
-      if (getJudgement()?.phase === 'writing' && getJudgement()?.kiraId === state.userId){
-        showJudgementWritePop(true);
-      }
-    }
   };
   const endDraw = () => { judgementLastPoint = null; };
 
@@ -4387,6 +4480,38 @@ async function advanceTurnToNextPlayer(){
   await set(turnRef, { currentPlayerId: next.id, turnSeq: nextSeq, drawn:false, paused:false, updatedAt: Date.now() });
 }
 
+async function advanceTurnToNextPlayerWithDraw(){
+  if (!state.roomCode) return;
+  const players = await getSeatedPlayers();
+  const activePlayers = players.filter(p => !isEliminated(p.id));
+  if (!activePlayers.length) return;
+
+  const currentId = state.turn.currentPlayerId || activePlayers[0].id;
+  const idx = activePlayers.findIndex(p => p.id === currentId);
+  const next = activePlayers[(idx >= 0 ? idx + 1 : 0) % activePlayers.length];
+
+  const turnRef = ref(db, `rooms/${state.roomCode}/turn`);
+  const tSnap = await get(turnRef);
+  const t = tSnap.val() || {};
+  const nextSeq = Number(t.turnSeq || 0) + 1;
+
+  await set(turnRef, { currentPlayerId: next.id, turnSeq: nextSeq, drawn:true, paused:true, updatedAt: Date.now() });
+
+  let drawn = await drawOneFromDeckAtomic();
+  if (!drawn){
+    await reshuffleFromDiscardAndPauseTurn(next.id, nextSeq);
+    drawn = await drawOneFromDeckAtomic();
+  }
+
+  if (drawn){
+    await emitDrawEvent(next.id, nextSeq, 'turn');
+    await sleep(DRAW_COMMIT_DELAY_MS);
+    await addCardToHandAtomic(next.id, drawn);
+  }
+
+  await update(turnRef, { paused:false });
+}
+
 /* ============================
    参加 & UI
    ============================ */
@@ -4690,6 +4815,10 @@ function renderPlayerCircle(players){
 
     const j = getJudgement();
     const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
+    const isJudgementWriting = !!(j?.active && j.phase === 'writing' && j.kiraId === state.userId);
+    if ((isJudgementSelecting || isJudgementWriting) && p.id === state.userId){
+      tag.classList.add('judgement-self-hidden');
+    }
     if (isJudgementSelecting && p.id !== state.userId){
       tag.classList.add('judgement-targetable');
       tag.addEventListener('click', async () => {
@@ -4748,10 +4877,10 @@ function renderPlayerCircle(players){
       idSlide.className = 'eliminated-identity-card';
       idSlide.textContent = eliminatedIdentity;
       const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
-      if (Number.isFinite(elapsed) && elapsed >= 1200){
+      if (Number.isFinite(elapsed) && elapsed >= 200){
         idSlide.classList.add('settled');
       } else if (Number.isFinite(elapsed)){
-        idSlide.style.animationDelay = `${Math.max(0, 1200 - elapsed)}ms`;
+        idSlide.style.animationDelay = `${Math.max(0, 200 - elapsed)}ms`;
       }
       tag.appendChild(idSlide);
     }
@@ -5031,7 +5160,8 @@ async function dealAllCardsAndInitialDraw(){
     hands[p.id] = { identity, cards };
   }
 
-  const firstPlayerId = players[0].id;
+  const firstPlayerIndex = Math.floor(Math.random() * players.length);
+  const firstPlayerId = players[firstPlayerIndex].id;
 
   const initialDraw = deckRaw.shift();
   const initialDrawDisp = (initialDraw !== undefined) ? String(initialDraw) : null;
