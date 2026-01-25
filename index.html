@@ -237,6 +237,12 @@
     box-shadow:0 0 0 9999px rgba(0,0,0,.96);
     z-index:5;
   }
+  .player-circle.judgement-spotlight-kira .mini-hand-circle{
+    box-shadow:0 0 0 9999px rgba(0,0,0,.96);
+    background:rgba(255,255,255,.06);
+    backdrop-filter:blur(2px);
+    z-index:5;
+  }
   .player-tag .mini-card{
     position:absolute;left:50%;top:0;width:24px;height:33px;
     border-radius:4px;border:1px solid #bbb;
@@ -3169,14 +3175,17 @@ function syncJudgementUI(){
   }
 
   if (j.phase === 'select' || j.phase === 'writing'){
-    if (!isKira()){
-      setJudgementFade(false);
-      playerCircle.classList.add('judgement-spotlight');
+    setJudgementFade(true);
+    if (isKira()){
+      playerCircle.classList.add('judgement-spotlight-kira');
+      playerCircle.classList.remove('judgement-spotlight');
     } else {
       playerCircle.classList.remove('judgement-spotlight');
+      playerCircle.classList.remove('judgement-spotlight-kira');
     }
   } else {
     playerCircle.classList.remove('judgement-spotlight');
+    playerCircle.classList.remove('judgement-spotlight-kira');
   }
 
   if (j.phase === 'writing' && j.kiraId === state.userId){
