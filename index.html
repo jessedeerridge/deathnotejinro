@@ -726,6 +726,7 @@
     z-index:12015;
     pointer-events:auto;
     transition:width 0.4s ease, transform 0.4s ease;
+    overflow:hidden;
   }
   .judgement-notebook.hidden{ display:none; }
   .judgement-notebook.open{
@@ -733,6 +734,7 @@
     transform:translate(calc(-50% + 20px), -50%);
   }
   .judgement-page{
+    flex:0 0 auto;
     width:120px;
     height:170px;
     background:#f8f8f8;
@@ -742,10 +744,15 @@
   }
   .judgement-page:last-child{
     opacity:0;
-    transition:opacity 0.2s ease;
+    width:0;
+    transform:scaleX(0);
+    transform-origin:left center;
+    transition:opacity 0.2s ease, width 0.4s ease, transform 0.4s ease;
   }
   .judgement-notebook.open .judgement-page:last-child{
     opacity:1;
+    width:120px;
+    transform:scaleX(1);
   }
   .judgement-canvas{
     position:absolute;
