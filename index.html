@@ -315,6 +315,24 @@
     animation: watchPulseMini 760ms ease-in-out infinite;
   }
 
+  /* =========================================================
+     ★追加：2（拳銃）対象選択（使用者のみ：全員の扇手札を大小アニメ）
+     ========================================================= */
+  @keyframes gun2PulseMini{
+    0%  { transform:translate(-50%,0) rotate(var(--rot,0deg)) scale(1); }
+    50% { transform:translate(-50%,0) rotate(var(--rot,0deg)) scale(1.14); }
+    100%{ transform:translate(-50%,0) rotate(var(--rot,0deg)) scale(1); }
+  }
+  .player-tag.gun2-targetable{
+    cursor:pointer;
+    box-shadow:0 0 0 2px rgba(17,17,17,.10);
+  }
+  .player-tag.gun2-targetable .mini-hand{ pointer-events:auto; }
+  .player-tag.gun2-targetable .mini-card{
+    pointer-events:auto;
+    animation: gun2PulseMini 760ms ease-in-out infinite;
+  }
+
   /* ★ 6：点線矢印＋👀（監視リンク専用SVG） */
   .watch-layer{
     position:absolute;
@@ -473,6 +491,18 @@
 
   /* ★ 13：死神（扇手札の1枚を表で0表示） */
   .mini-card.shinigami-face{
+    background:#fff;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    font-size:12px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
+  }
+
+  /* ★ 2：拳銃（扇手札の1枚を表で拡大表示） */
+  .mini-card.gun2-face{
     background:#fff;
     color:#111;
     display:flex;
@@ -909,6 +939,7 @@
     ★ 変更：<b>8（交換）</b>：対象を選択→対象が最小カードを選ぶ→8使用者に移動→8使用者が返す1枚を選ぶ→対象へ移動。<br>
     ★ 追加：<b>6（監視）</b>：対象プレイヤーを選択→対象の手札を中央に拡大表示（使用者のみ）／他プレイヤーと対象には点線矢印＋👀。<br>
     ★ 追加：<b>5（証人）</b>：使用者だけが各プレイヤーの左に正体カード裏を出して選択→対象の手札を中央に拡大（使用者のみ）／他プレイヤーと対象には点線矢印＋👀。<br>
+    ★ 追加：<b>2（拳銃）</b>：使用者が対象を選択→対象が最小カードを選択→扇手札で表向き拡大（4秒）→次の手番。<br>
     ★ 変更：<b>9/8 の移動アニメは裏面・デッキサイズ</b>。<br>
     ★ 修正：<b>同じ数字が複数あっても、クリックした1枚だけ選ばれる</b>（indexで管理）。
   </div>
@@ -970,6 +1001,7 @@ const state = {
   witness5: null,      // ★ 5（証人）
   vote7: null,         // ★ 7（投票）
   shinigami13: null,   // ★ 13（死神）
+  gun2: null,          // ★ 2（拳銃）
 };
 
 const mainEl = document.getElementById('main');
@@ -1048,7 +1080,7 @@ const btnShinigamiCloseYes = document.getElementById('btnShinigamiCloseYes');
 const ROLE_HELP = [
   { name: "⓪ デスノート", text: "（効果は後で実装）" },
   { name: "① 逮捕", text: "（効果は後で実装）" },
-  { name: "② 拳銃", text: "（効果は後で実装）" },
+  { name: "② 拳銃", text: "使用者だけ：全員の扇手札を選択（大小アニメ）→選ばれたプレイヤーが最小カードを選択（同値なら任意）→そのカードを扇手札上で表向き拡大表示（4秒）→次の手番へ" },
   { name: "③ 偽名", text: "（効果は後で実装）" },
   { name: "④ アリバイ", text: "（効果は後で実装）" },
   { name: "⑤ 証人", text: "使用者だけ：全員の扇手札の左に「正体カード裏」を出して選択。選んだプレイヤーの手札を中央に拡大表示（使用者のみ）。他プレイヤー＆対象：使用者→対象の正体カード裏へ点線矢印＋👀" },
@@ -1155,6 +1187,14 @@ function vote7Phase(){ return String(state.vote7?.phase || ''); }
 function isVote7Voting(){ return isVote7Active() && vote7Phase() === 'voting'; }
 function isVote7Revealing(){ return isVote7Active() && vote7Phase() === 'reveal'; }
 
+/* ★ 2（拳銃） */
+function isGun2Active(){ return !!state.gun2?.active; }
+function gun2Phase(){ return String(state.gun2?.phase || ''); }
+function getGun2(){ return (state.gun2 && typeof state.gun2 === 'object') ? state.gun2 : null; }
+function isGun2PickingTarget(){ return isGun2Active() && gun2Phase() === 'pickTarget'; }
+function isGun2TargetPickingMin(){ return isGun2Active() && gun2Phase() === 'targetPickMin'; }
+function isGun2Showing(){ return isGun2Active() && gun2Phase() === 'show'; }
+
 /* ★ 13（死神） */
 function isShinigamiActive(){ return !!state.shinigami13?.active; }
 function getShinigami13(){ return (state.shinigami13 && typeof state.shinigami13 === 'object') ? state.shinigami13 : null; }
@@ -1173,8 +1213,9 @@ function calcIsPlayable(){
   const wiActive  = isWitnessActive();
   const vActive   = isVote7Active();
   const sActive   = isShinigamiActive();
+  const gActive   = isGun2Active();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && (count === 3);
+  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && (count === 3);
 }
 
 /* =========================
@@ -1781,6 +1822,34 @@ function subscribeShinigami13(){
     state.shinigami13 = (s && typeof s === 'object') ? s : null;
     updateTurnUI();
     renderPlayerCircle(latestPlayers);
+  });
+}
+
+/* ★ 2（拳銃）購読 */
+let gun2RevealTimer = null;
+function clearGun2RevealTimer(){
+  if (gun2RevealTimer) clearTimeout(gun2RevealTimer);
+  gun2RevealTimer = null;
+}
+
+function subscribeGun2(){
+  const gRef = ref(db, `rooms/${state.roomCode}/gun2`);
+  onValue(gRef, snap => {
+    const g = snap.val() || null;
+    state.gun2 = (g && typeof g === 'object') ? g : null;
+
+    if (isGun2Showing() && state.gun2?.showAt){
+      const remaining = Math.max(0, 4000 - (Date.now() - Number(state.gun2.showAt || 0)));
+      clearGun2RevealTimer();
+      gun2RevealTimer = setTimeout(() => {
+        finishGun2AfterShow().catch(console.warn);
+      }, remaining);
+    } else {
+      clearGun2RevealTimer();
+    }
+
+    updateTurnUI();
+    renderHands();
   });
 }
 
@@ -2471,6 +2540,103 @@ async function finishWitness5(){
 }
 
 /* =========================
+   ★ 2（拳銃）状態機械
+   ========================= */
+async function startGun2(byPlayerId){
+  if (!state.roomCode) return;
+
+  const gRef = ref(db, `rooms/${state.roomCode}/gun2`);
+  const snap = await get(gRef);
+  const cur = snap.val();
+  if (cur?.active) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+
+  await set(gRef, {
+    active: true,
+    phase: 'pickTarget',
+    by: byPlayerId,
+    targetId: null,
+    targetPick: null,
+    showAt: null,
+    at: Date.now(),
+    resolveLock: null
+  });
+}
+
+async function pickGun2Target(targetId){
+  if (!state.roomCode) return;
+  const g = getGun2();
+  if (!g?.active) return;
+  if (g.phase !== 'pickTarget') return;
+  if (g.by !== state.userId) return;
+  if (!targetId || targetId === state.userId) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/gun2`), {
+    phase: 'targetPickMin',
+    targetId,
+    targetPick: null,
+    updatedAt: Date.now()
+  });
+}
+
+async function pickGun2MinCardByIndex(cardIndex, cardValue){
+  if (!state.roomCode) return;
+  const g = getGun2();
+  if (!g?.active) return;
+  if (g.phase !== 'targetPickMin') return;
+  if (g.targetId !== state.userId) return;
+
+  const pick = { idx:Number(cardIndex), card:String(cardValue), at: Date.now() };
+  await update(ref(db, `rooms/${state.roomCode}/gun2`), {
+    phase: 'show',
+    targetPick: pick,
+    showAt: Date.now(),
+    updatedAt: Date.now()
+  });
+}
+
+async function acquireGun2Lock(){
+  if (!state.roomCode) return false;
+  const lockRef = ref(db, `rooms/${state.roomCode}/gun2/resolveLock`);
+  const myId = state.userId;
+
+  const res = await runTransaction(lockRef, (v) => {
+    if (v && v.by && v.at && (Date.now() - v.at) < 15000) return;
+    return { by: myId, at: Date.now() };
+  }, { applyLocally:false });
+
+  return !!res.committed;
+}
+
+async function releaseGun2Lock(){
+  if (!state.roomCode) return;
+  await set(ref(db, `rooms/${state.roomCode}/gun2/resolveLock`), null);
+}
+
+async function finishGun2AfterShow(){
+  if (!state.roomCode) return;
+
+  const locked = await acquireGun2Lock();
+  if (!locked) return;
+
+  try{
+    const gSnap = await get(ref(db, `rooms/${state.roomCode}/gun2`));
+    const g = gSnap.val();
+    if (!g?.active || g.phase !== 'show') return;
+
+    const updates = {};
+    updates[`rooms/${state.roomCode}/gun2`] = null;
+    updates[`rooms/${state.roomCode}/turn/paused`] = false;
+    await update(ref(db, `/`), updates);
+
+    await advanceTurnToNextPlayer();
+  } finally {
+    await releaseGun2Lock();
+  }
+}
+
+/* =========================
    ★ 13（死神）状態機械
    ========================= */
 async function startShinigami13(byPlayerId){
@@ -2721,6 +2887,13 @@ function renderMyHand(){
   const minIdxs8 = isTargetPicking ? getMinTargets(cards).indices : [];
   const picked8 = localExchangePicked;
 
+  const g = getGun2();
+  const isGun2TargetPick = !!(g?.active && g?.phase === 'targetPickMin' && g?.targetId === myId);
+  const minIdxs2 = isGun2TargetPick ? getMinTargets(cards).indices : [];
+  const picked2 = (isGun2TargetPick && g?.targetPick && Number.isFinite(Number(g.targetPick.idx)))
+    ? { idx:Number(g.targetPick.idx), card:String(g.targetPick.card ?? '') }
+    : null;
+
   myHandEl.innerHTML = '';
 
   cards.forEach((v, i) => {
@@ -2757,6 +2930,14 @@ function renderMyHand(){
       });
     }
 
+    if (!isInvestigationActive() && !isExchangeActive() && isGun2TargetPick && minIdxs2.includes(i)){
+      card.classList.add('min-target');
+      if (picked2 && picked2.idx === i) card.classList.add('selected');
+      card.addEventListener('click', async () => {
+        await pickGun2MinCardByIndex(i, v);
+      });
+    }
+
     card.addEventListener('pointerdown', onCardPointerDown);
     card.addEventListener('pointermove', onCardPointerMove);
     card.addEventListener('pointerup', onCardPointerUp);
@@ -2790,6 +2971,7 @@ async function maybeAutoDrawAtTurnStart(){
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
   if (isWitnessActive()) return;
+  if (isGun2Active()) return;
 
   autoDrawInFlight = true;
   const turnRef = ref(db, `rooms/${state.roomCode}/turn`);
@@ -3220,6 +3402,11 @@ async function playCardFromHand(cardIndex){
     return;
   }
 
+  if (used === "2"){
+    await startGun2(myId);
+    return;
+  }
+
   if (used === "13"){
     await startShinigami13(myId);
     return;
@@ -3251,6 +3438,7 @@ async function advanceTurnToNextPlayer(){
   if (isWitnessActive()) return;
   if (isVote7Active()) return;
   if (isShinigamiActive()) return;
+  if (isGun2Active()) return;
 
   const players = await getSeatedPlayers();
   if (!players.length) return;
@@ -3329,6 +3517,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeVote7();
   // ★ 13（死神）
   subscribeShinigami13();
+  // ★ 2（拳銃）
+  subscribeGun2();
 
   syncSeatUI();
 });
@@ -3503,6 +3693,8 @@ function renderPlayerCircle(players){
   const voteResults = (vActive && vPhase === 'reveal') ? buildVote7Results(state.vote7, players) : {};
   const playerNameMap = new Map(players.map(p => [p.id, p.name]));
   const sh = getShinigami13();
+  const g = getGun2();
+  const iAmGun2By = !!(g?.active && g?.phase === 'pickTarget' && g?.by === state.userId);
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
@@ -3548,6 +3740,14 @@ function renderPlayerCircle(players){
       });
     }
 
+    /* ★ 2（拳銃）：対象選択（使用者だけ） */
+    if (iAmGun2By && p.id !== state.userId){
+      tag.classList.add('gun2-targetable');
+      tag.addEventListener('click', async () => {
+        await pickGun2Target(p.id);
+      });
+    }
+
     /* ★ 5（証人）：対象選択（使用者だけ）
        - 各プレイヤーの「扇手札の左」に 正体カード裏 1枚を表示
        - クリックで対象選択
@@ -3572,6 +3772,24 @@ function renderPlayerCircle(players){
 
     const handData = state.hands[p.id];
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
+    const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
+    let gun2RevealIdx = null;
+    let gun2RevealCard = null;
+    if (showGun2Reveal){
+      const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
+      const pickIdx = Number(g?.targetPick?.idx);
+      const pickCard = String(g?.targetPick?.card ?? '');
+      if (Number.isFinite(pickIdx) && pickIdx >= 0 && pickIdx < handCards.length){
+        gun2RevealIdx = pickIdx;
+        gun2RevealCard = String(handCards[pickIdx] ?? pickCard);
+      } else {
+        const pos = handCards.indexOf(pickCard);
+        if (pos >= 0){
+          gun2RevealIdx = pos;
+          gun2RevealCard = pickCard;
+        }
+      }
+    }
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
@@ -3620,6 +3838,11 @@ function renderPlayerCircle(players){
           card.textContent = '0';
           card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
           card.style.zIndex = String(200 + idx2);
+        } else if (showGun2Reveal && Number.isFinite(Number(gun2RevealIdx)) && idx2 === Number(gun2RevealIdx)){
+          card.classList.add('gun2-face');
+          card.textContent = gun2RevealCard ?? '';
+          card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
+          card.style.zIndex = String(200 + idx2);
         }
 
         miniHand.appendChild(card);
@@ -3629,6 +3852,13 @@ function renderPlayerCircle(players){
           card.addEventListener('click', async (e) => {
             e.stopPropagation();
             await pickWatch6Target(p.id);
+          });
+        }
+
+        if (iAmGun2By){
+          card.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickGun2Target(p.id);
           });
         }
       });
@@ -3647,6 +3877,10 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
+        tag.appendChild(miniHand);
+      } else if (iAmGun2By && p.id !== state.userId){
+        const miniHand = document.createElement('div');
+        miniHand.className = 'mini-hand';
         tag.appendChild(miniHand);
       } else {
         // 他人側：対象だけ裏を表示
@@ -3818,6 +4052,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/witness5`), null),
     set(ref(db, `rooms/${state.roomCode}/vote7`), null),
     set(ref(db, `rooms/${state.roomCode}/shinigami13`), null),
+    set(ref(db, `rooms/${state.roomCode}/gun2`), null),
   ]);
 
   if (initialDrawDisp){
@@ -3858,6 +4093,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/witness5`)),
     remove(ref(db, `${base}/vote7`)),
     remove(ref(db, `${base}/shinigami13`)),
+    remove(ref(db, `${base}/gun2`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
