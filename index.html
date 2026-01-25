@@ -628,6 +628,27 @@
     z-index:12005;
     pointer-events:none;
   }
+  .judgement-fade.kira-spotlight{
+    --spotlight-radius: min(32vmin, 200px);
+    background:
+      radial-gradient(
+        circle at center,
+        rgba(0,0,0,0) 0 calc(var(--spotlight-radius) - 6px),
+        rgba(0,0,0,.96) calc(var(--spotlight-radius) + 6px)
+      );
+  }
+  .judgement-fade.kira-spotlight::after{
+    content:'';
+    position:fixed;
+    left:50%;
+    top:50%;
+    width:calc(var(--spotlight-radius) * 2);
+    height:calc(var(--spotlight-radius) * 2);
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.18);
+    box-shadow:0 0 18px rgba(255,255,255,.08);
+  }
   .judgement-fade.active{ opacity:0.96; }
   .judgement-message{
     position:fixed;
@@ -3122,6 +3143,11 @@ function setJudgementFade(active){
   judgementFade.classList.toggle('active', active);
 }
 
+function setJudgementFadeSpotlight(active){
+  if (!judgementFade) return;
+  judgementFade.classList.toggle('kira-spotlight', active);
+}
+
 function showJudgementMessage(show){
   if (!judgementMessage) return;
   judgementMessage.classList.toggle('hidden', !show);
@@ -3145,6 +3171,7 @@ function syncJudgementUI(){
 
   if (!hasActive){
     setJudgementFade(false);
+    setJudgementFadeSpotlight(false);
     showJudgementMessage(false);
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
@@ -3163,6 +3190,7 @@ function syncJudgementUI(){
     if (j.at && lastJudgementNoZeroAt === j.at) return;
     lastJudgementNoZeroAt = j.at || Date.now();
     setJudgementFade(true);
+    setJudgementFadeSpotlight(false);
     showJudgementMessage(false);
     setTimeout(() => {
       showJudgementMessage(true);
@@ -3176,6 +3204,7 @@ function syncJudgementUI(){
 
   if (j.phase === 'select' || j.phase === 'writing'){
     setJudgementFade(true);
+    setJudgementFadeSpotlight(isKira() && j.kiraId === state.userId);
     if (isKira()){
       playerCircle.classList.add('judgement-spotlight-kira');
       playerCircle.classList.remove('judgement-spotlight');
@@ -3186,6 +3215,7 @@ function syncJudgementUI(){
   } else {
     playerCircle.classList.remove('judgement-spotlight');
     playerCircle.classList.remove('judgement-spotlight-kira');
+    setJudgementFadeSpotlight(false);
   }
 
   if (j.phase === 'writing' && j.kiraId === state.userId){
@@ -4607,7 +4637,7 @@ function buildDeckForPlayers(playerCount){
   const deck = [];
 
   if (playerCount <= 4){
-    pushN(deck, 0, 8);
+    pushN(deck, 0, 50);
     pushN(deck, 1, 1);
     pushN(deck, 2, 1);
     pushN(deck, 3, 1);
