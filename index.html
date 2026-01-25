@@ -486,6 +486,35 @@
   .player-tag .judgement-id-face{
     margin-left:-40px;
   }
+  @keyframes eliminatedIdSlide{
+    0% { transform:translate(calc(-50% - 40px), 0); }
+    100% { transform:translate(-50%, 0); }
+  }
+  .eliminated-identity-card{
+    position:absolute;
+    left:50%;
+    top:calc(100% + 6px);
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.45);
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    font-size:10px;
+    font-weight:900;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index:55;
+    transform:translate(calc(-50% - 40px), 0);
+    animation: eliminatedIdSlide 360ms ease-out forwards;
+    animation-delay:1200ms;
+  }
+  .eliminated-identity-card.settled{
+    animation:none;
+    transform:translate(-50%, 0);
+  }
 
   .witness-layer{
     position:absolute;
@@ -4691,8 +4720,10 @@ function renderPlayerCircle(players){
     }
 
     const handData = state.hands[p.id];
+    const eliminatedRecord = state.eliminated?.[p.id];
     const eliminated = isEliminated(p.id);
-    const eliminatedIdentity = state.eliminated?.[p.id]?.identity || handData?.identity || '？';
+    const eliminatedIdentity = eliminatedRecord?.identity || handData?.identity || '？';
+    const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     let gun2RevealIdx = null;
@@ -4712,6 +4743,19 @@ function renderPlayerCircle(players){
         }
       }
     }
+    if (eliminated && eliminatedDiscardedAt){
+      const idSlide = document.createElement('div');
+      idSlide.className = 'eliminated-identity-card';
+      idSlide.textContent = eliminatedIdentity;
+      const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
+      if (Number.isFinite(elapsed) && elapsed >= 1200){
+        idSlide.classList.add('settled');
+      } else if (Number.isFinite(elapsed)){
+        idSlide.style.animationDelay = `${Math.max(0, 1200 - elapsed)}ms`;
+      }
+      tag.appendChild(idSlide);
+    }
+
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
@@ -4719,7 +4763,7 @@ function renderPlayerCircle(players){
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
 
-      if (eliminated){
+      if (eliminated && !eliminatedDiscardedAt){
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
         idFace.textContent = eliminatedIdentity;
@@ -4813,7 +4857,7 @@ function renderPlayerCircle(players){
         });
         miniHand.appendChild(idBack);
         tag.appendChild(miniHand);
-      } else if (eliminated && p.id !== state.userId){
+      } else if (eliminated && !eliminatedDiscardedAt && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
         const miniCircle = document.createElement('div');
