@@ -1336,6 +1336,7 @@ let gun2ConfirmPending = false;
 let judgementPopAnimating = false;
 let judgementDrawActive = false;
 let judgementLastPoint = null;
+let lastJudgementNoZeroAt = null;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -3138,6 +3139,8 @@ function syncJudgementUI(){
   }
 
   if (j.phase === 'noZero'){
+    if (j.at && lastJudgementNoZeroAt === j.at) return;
+    lastJudgementNoZeroAt = j.at || Date.now();
     setJudgementFade(true);
     showJudgementMessage(false);
     setTimeout(() => {
@@ -3178,7 +3181,7 @@ function getCurrentRound(playerCount){
   return Math.max(1, Math.ceil(seq / playerCount));
 }
 
-async function startJudgementSequence(players){
+async function startJudgementSequence(players, round){
   if (!state.roomCode) return;
   const lockRef = ref(db, `rooms/${state.roomCode}/judgementLock`);
   const myId = state.userId;
@@ -3213,6 +3216,10 @@ async function startJudgementSequence(players){
       targetId: null,
       at: Date.now(),
       showNote: false
+    });
+    await update(ref(db, `rooms/${state.roomCode}/judgementMeta`), {
+      lastRound: Number(round || 0),
+      updatedAt: Date.now()
     });
 
     if (!kiraHasZero){
@@ -4035,8 +4042,9 @@ async function advanceTurnToNextPlayer(){
 
   const isLastPlayer = (idx === players.length - 1);
   const round = getCurrentRound(players.length);
-  if (isLastPlayer && round >= 2){
-    await startJudgementSequence(players);
+  const lastRoundTriggered = Number(state.room?.judgementMeta?.lastRound || 0);
+  if (isLastPlayer && round >= 2 && round > lastRoundTriggered){
+    await startJudgementSequence(players, round);
     return;
   }
 
@@ -4674,6 +4682,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/gun2`), null),
     set(ref(db, `rooms/${state.roomCode}/judgement`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementLock`), null),
+    set(ref(db, `rooms/${state.roomCode}/judgementMeta`), null),
   ]);
 
   if (initialDrawDisp){
@@ -4717,6 +4726,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/gun2`)),
     remove(ref(db, `${base}/judgement`)),
     remove(ref(db, `${base}/judgementLock`)),
+    remove(ref(db, `${base}/judgementMeta`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
