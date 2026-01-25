@@ -471,6 +471,39 @@
   .witness-close-pop.hidden{ display:none; }
   .witness-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
+  /* ★ 13：死神（扇手札の1枚を表で0表示） */
+  .mini-card.shinigami-face{
+    background:#fff;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    font-size:12px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
+  }
+
+  .shinigami-close-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:10px 12px;
+    z-index:12040;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:260px;
+    justify-content:space-between;
+  }
+  .shinigami-close-pop.hidden{ display:none; }
+  .shinigami-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+
   .my-hand-wrapper{margin-top:16px;text-align:center;}
   .my-hand-title{display:none;}
   .my-hand-row{
@@ -808,6 +841,12 @@
   <button id="btnWitnessCloseYes" class="btn primary">はい</button>
 </div>
 
+<!-- ★ 13：閉じる確認ポップ（キラのみ） -->
+<div id="shinigamiClosePop" class="shinigami-close-pop hidden" aria-hidden="true">
+  <div class="msg">閉じてもいいですか？</div>
+  <button id="btnShinigamiCloseYes" class="btn primary">はい</button>
+</div>
+
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
@@ -930,6 +969,7 @@ const state = {
   surveillance6: null, // ★ 6（監視）
   witness5: null,      // ★ 5（証人）
   vote7: null,         // ★ 7（投票）
+  shinigami13: null,   // ★ 13（死神）
 };
 
 const mainEl = document.getElementById('main');
@@ -1000,6 +1040,10 @@ const witnessHandEl = document.getElementById('witnessHand');
 const witnessClosePop = document.getElementById('witnessClosePop');
 const btnWitnessCloseYes = document.getElementById('btnWitnessCloseYes');
 
+/* ★ 13（死神）閉じる確認 */
+const shinigamiClosePop = document.getElementById('shinigamiClosePop');
+const btnShinigamiCloseYes = document.getElementById('btnShinigamiCloseYes');
+
 /* ===== カード説明 ===== */
 const ROLE_HELP = [
   { name: "⓪ デスノート", text: "（効果は後で実装）" },
@@ -1012,7 +1056,7 @@ const ROLE_HELP = [
   { name: "⑦ 投票", text: "全員が他プレイヤーのネームタグをクリックして投票。全員投票後、各プレイヤーの右に「👈投票者名」を縦表示（5秒）して次の手番へ。" },
   { name: "⑧ 交換", text: "対象を選択→対象が最小カードを選ぶ→⑧使用者へ→⑧使用者が返すカードを選ぶ→対象へ" },
   { name: "⑨ 尋問（右/左選択）", text: "右/左を選択→全員が最小カードを1枚選択→右(前の手番) / 左(次の手番)へ一斉に渡す" },
-  { name: "⑬ 死神", text: "（効果は後で実装）" },
+  { name: "⑬ 死神", text: "正体がキラ／信者のプレイヤーにのみ、0カードを持つプレイヤーの0カードが表向きで表示（その1枚だけ1.5倍）。キラの「はい」でターン終了。※13使用者ではない" },
 ];
 
 function renderHelpList(){
@@ -1111,6 +1155,13 @@ function vote7Phase(){ return String(state.vote7?.phase || ''); }
 function isVote7Voting(){ return isVote7Active() && vote7Phase() === 'voting'; }
 function isVote7Revealing(){ return isVote7Active() && vote7Phase() === 'reveal'; }
 
+/* ★ 13（死神） */
+function isShinigamiActive(){ return !!state.shinigami13?.active; }
+function getShinigami13(){ return (state.shinigami13 && typeof state.shinigami13 === 'object') ? state.shinigami13 : null; }
+function getMyIdentity(){ return state.hands?.[state.userId]?.identity || null; }
+function isKira(){ return getMyIdentity() === 'キラ'; }
+function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' || id === '信者'; }
+
 function calcIsPlayable(){
   const myId = state.userId;
   const hand = state.hands[myId];
@@ -1121,8 +1172,9 @@ function calcIsPlayable(){
   const wActive   = isWatchActive();
   const wiActive  = isWitnessActive();
   const vActive   = isVote7Active();
+  const sActive   = isShinigamiActive();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && (count === 3);
+  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && (count === 3);
 }
 
 /* =========================
@@ -1491,6 +1543,8 @@ function updateTurnUI(){
   syncWatchCenterOverlay();
   // ★ 5：使用者だけ中央表示＋閉じる
   syncWitnessCenterOverlay();
+  // ★ 13：キラだけ閉じる
+  syncShinigamiClosePop();
 }
 
 function updateHostUI(){
@@ -1716,6 +1770,17 @@ function subscribeVote7(){
     if (state.vote7?.active && state.vote7.phase === 'voting'){
       maybeResolveVote7();
     }
+  });
+}
+
+/* ★ 13（死神）購読 */
+function subscribeShinigami13(){
+  const sRef = ref(db, `rooms/${state.roomCode}/shinigami13`);
+  onValue(sRef, snap => {
+    const s = snap.val() || null;
+    state.shinigami13 = (s && typeof s === 'object') ? s : null;
+    updateTurnUI();
+    renderPlayerCircle(latestPlayers);
   });
 }
 
@@ -2406,6 +2471,82 @@ async function finishWitness5(){
 }
 
 /* =========================
+   ★ 13（死神）状態機械
+   ========================= */
+async function startShinigami13(byPlayerId){
+  if (!state.roomCode) return;
+
+  const sRef = ref(db, `rooms/${state.roomCode}/shinigami13`);
+  const snap = await get(sRef);
+  const cur = snap.val();
+  if (cur?.active) return;
+
+  const handsSnap = await get(ref(db, `rooms/${state.roomCode}/hands`));
+  const hands = handsSnap.val() || {};
+
+  let targetId = null;
+  let zeroIndex = null;
+  for (const [pid, hand] of Object.entries(hands)){
+    const cards = Array.isArray(hand?.cards) ? hand.cards : [];
+    const idx = cards.indexOf('0');
+    if (idx >= 0){
+      targetId = pid;
+      zeroIndex = idx;
+      break;
+    }
+  }
+
+  if (!targetId){
+    await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+    await advanceTurnToNextPlayer();
+    return;
+  }
+
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+
+  await set(sRef, {
+    active: true,
+    phase: 'show',
+    by: byPlayerId,
+    targetId,
+    zeroIndex,
+    at: Date.now()
+  });
+}
+
+async function finishShinigami13(){
+  if (!state.roomCode) return;
+  const s = getShinigami13();
+  if (!s?.active) return;
+  if (!isKira()) return;
+  if (s.phase !== 'show') return;
+
+  await update(ref(db, `rooms/${state.roomCode}/shinigami13`), {
+    active:false, phase:null, by:null, targetId:null, zeroIndex:null, updatedAt:Date.now()
+  });
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+
+  await advanceTurnToNextPlayer();
+}
+
+function syncShinigamiClosePop(){
+  const s = getShinigami13();
+  if (!s?.active || s.phase !== 'show' || !s.targetId || !isKira()){
+    shinigamiClosePop.classList.add('hidden');
+    shinigamiClosePop.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  shinigamiClosePop.classList.remove('hidden');
+  shinigamiClosePop.setAttribute('aria-hidden', 'false');
+}
+
+btnShinigamiCloseYes.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (shinigamiClosePop.classList.contains('hidden')) return;
+  await finishShinigami13();
+});
+
+/* =========================
    ★ 7（投票）状態機械
    ========================= */
 function getVote7(){
@@ -3079,6 +3220,11 @@ async function playCardFromHand(cardIndex){
     return;
   }
 
+  if (used === "13"){
+    await startShinigami13(myId);
+    return;
+  }
+
   await resolveCardEffectPlaceholder(used);
   await advanceTurnToNextPlayer();
 }
@@ -3104,6 +3250,7 @@ async function advanceTurnToNextPlayer(){
   if (isWatchActive()) return;
   if (isWitnessActive()) return;
   if (isVote7Active()) return;
+  if (isShinigamiActive()) return;
 
   const players = await getSeatedPlayers();
   if (!players.length) return;
@@ -3180,6 +3327,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeWitness5();
   // ★ 7（投票）
   subscribeVote7();
+  // ★ 13（死神）
+  subscribeShinigami13();
 
   syncSeatUI();
 });
@@ -3353,6 +3502,7 @@ function renderPlayerCircle(players){
   const showVotedStatus = vActive && vPhase === 'voting' && iHaveVoted;
   const voteResults = (vActive && vPhase === 'reveal') ? buildVote7Results(state.vote7, players) : {};
   const playerNameMap = new Map(players.map(p => [p.id, p.name]));
+  const sh = getShinigami13();
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
@@ -3421,6 +3571,7 @@ function renderPlayerCircle(players){
     }
 
     const handData = state.hands[p.id];
+    const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
@@ -3463,6 +3614,14 @@ function renderPlayerCircle(players){
         card.style.setProperty('--rot', `${angleDeg}deg`);
         card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg)`;
         card.style.zIndex = String(10 + idx2);
+
+        if (showShinigamiReveal && Number.isFinite(Number(sh?.zeroIndex)) && idx2 === Number(sh.zeroIndex)){
+          card.classList.add('shinigami-face');
+          card.textContent = '0';
+          card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
+          card.style.zIndex = String(200 + idx2);
+        }
+
         miniHand.appendChild(card);
 
         // ★ 6（監視）：mini-cardクリックでも対象選択できる（使用者だけ）
@@ -3545,7 +3704,7 @@ function buildDeckForPlayers(playerCount){
   const deck = [];
 
   if (playerCount <= 4){
-    pushN(deck, 0, 1);
+    pushN(deck, 0, 8);
     pushN(deck, 1, 1);
     pushN(deck, 2, 1);
     pushN(deck, 3, 1);
@@ -3555,6 +3714,7 @@ function buildDeckForPlayers(playerCount){
     pushN(deck, 7, 2);
     pushN(deck, 8, 4);
     pushN(deck, 9, 4);
+    pushN(deck, 13, 8);
     return deck;
   }
 
@@ -3657,6 +3817,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/surveillance6`), null),
     set(ref(db, `rooms/${state.roomCode}/witness5`), null),
     set(ref(db, `rooms/${state.roomCode}/vote7`), null),
+    set(ref(db, `rooms/${state.roomCode}/shinigami13`), null),
   ]);
 
   if (initialDrawDisp){
@@ -3696,6 +3857,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/surveillance6`)),
     remove(ref(db, `${base}/witness5`)),
     remove(ref(db, `${base}/vote7`)),
+    remove(ref(db, `${base}/shinigami13`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
@@ -3705,4 +3867,3 @@ btnResetRoom.addEventListener('click', async () => {
 
 </body>
 </html>
-
