@@ -688,7 +688,7 @@
     cursor:crosshair;
   }
 
-  .judgement-close-pop{
+  .judgement-confirm-pop{
     position:fixed;
     left:50%;
     bottom:14px;
@@ -706,8 +706,8 @@
     min-width:280px;
     justify-content:space-between;
   }
-  .judgement-close-pop.hidden{ display:none; }
-  .judgement-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+  .judgement-confirm-pop.hidden{ display:none; }
+  .judgement-confirm-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
   .my-hand-wrapper{margin-top:16px;text-align:center;}
   .my-hand-title{display:none;}
@@ -1071,9 +1071,12 @@
   <div class="judgement-page"></div>
   <canvas id="judgementCanvas" class="judgement-canvas"></canvas>
 </div>
-<div id="judgementClosePop" class="judgement-close-pop hidden" aria-hidden="true">
-  <div class="msg">閉じてもいいですか？</div>
-  <button id="btnJudgementCloseYes" class="btn primary">はい</button>
+<div id="judgementTargetPop" class="judgement-confirm-pop hidden" aria-hidden="true">
+  <div class="msg" id="judgementTargetMessage">選んだプレイヤーの名前を書いてください。</div>
+</div>
+<div id="judgementWritePop" class="judgement-confirm-pop hidden" aria-hidden="true">
+  <div class="msg">書きましたか？</div>
+  <button id="btnJudgementWriteYes" class="btn primary">はい</button>
 </div>
 
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
@@ -1288,8 +1291,10 @@ const judgementFade = document.getElementById('judgementFade');
 const judgementMessage = document.getElementById('judgementMessage');
 const judgementNotebook = document.getElementById('judgementNotebook');
 const judgementCanvas = document.getElementById('judgementCanvas');
-const judgementClosePop = document.getElementById('judgementClosePop');
-const btnJudgementCloseYes = document.getElementById('btnJudgementCloseYes');
+const judgementTargetPop = document.getElementById('judgementTargetPop');
+const judgementTargetMessage = document.getElementById('judgementTargetMessage');
+const judgementWritePop = document.getElementById('judgementWritePop');
+const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 
 /* ===== カード説明 ===== */
 const ROLE_HELP = [
@@ -1347,6 +1352,9 @@ let gun2ConfirmPending = false;
 let judgementPopAnimating = false;
 let judgementDrawActive = false;
 let judgementLastPoint = null;
+let judgementHasStroke = false;
+let judgementRevealHandledAt = null;
+let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 
 function generateRoomCode(length = 6){
@@ -3118,6 +3126,21 @@ function showJudgementMessage(show){
   judgementMessage.classList.toggle('hidden', !show);
 }
 
+function showJudgementTargetPop(show, message){
+  if (!judgementTargetPop) return;
+  if (judgementTargetMessage && message){
+    judgementTargetMessage.textContent = message;
+  }
+  judgementTargetPop.classList.toggle('hidden', !show);
+  judgementTargetPop.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function showJudgementWritePop(show){
+  if (!judgementWritePop) return;
+  judgementWritePop.classList.toggle('hidden', !show);
+  judgementWritePop.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
 function openJudgementNotebook(enableDraw){
   if (!judgementNotebook) return;
   judgementNotebook.classList.remove('hidden');
@@ -3137,12 +3160,15 @@ function syncJudgementUI(){
   if (!hasActive){
     setJudgementFade(false);
     showJudgementMessage(false);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
+    judgementLastTargetId = null;
+    judgementRevealHandledAt = null;
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
     }
-    judgementClosePop?.classList.add('hidden');
-    judgementClosePop?.setAttribute('aria-hidden','true');
     return;
   }
 
@@ -3155,6 +3181,9 @@ function syncJudgementUI(){
     lastJudgementNoZeroAt = j.at || Date.now();
     setJudgementFade(true);
     showJudgementMessage(false);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
     setTimeout(() => {
       showJudgementMessage(true);
       setTimeout(() => {
@@ -3169,23 +3198,42 @@ function syncJudgementUI(){
     const isActiveKira = isKira() && j.kiraId === state.userId;
     setJudgementFade(!isActiveKira);
     playerCircle.classList.remove('judgement-spotlight');
+    if (j.phase === 'writing' && isActiveKira){
+      const targetName = state.players?.find((p) => p.id === j.targetId)?.name || '対象プレイヤー';
+      if (judgementLastTargetId !== j.targetId){
+        judgementHasStroke = false;
+        showJudgementWritePop(false);
+        judgementLastTargetId = j.targetId || null;
+        if (judgementCanvas){
+          const ctx = judgementCanvas.getContext('2d');
+          ctx?.clearRect(0, 0, judgementCanvas.width, judgementCanvas.height);
+        }
+      }
+      showJudgementTargetPop(true, `${targetName}の名前を書いてください。`);
+      showJudgementWritePop(judgementHasStroke);
+    } else {
+      showJudgementTargetPop(false);
+      showJudgementWritePop(false);
+      judgementHasStroke = false;
+    }
   } else {
     playerCircle.classList.remove('judgement-spotlight');
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
+    judgementLastTargetId = null;
   }
 
   if (j.phase === 'writing' && j.kiraId === state.userId){
     openJudgementNotebook(true);
-    judgementClosePop?.classList.remove('hidden');
-    judgementClosePop?.setAttribute('aria-hidden','false');
-  } else {
-    judgementClosePop?.classList.add('hidden');
-    judgementClosePop?.setAttribute('aria-hidden','true');
   }
 
   if (j.phase === 'reveal' || j.showNote){
     openJudgementNotebook(false);
     setJudgementFade(false);
     showJudgementMessage(false);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
     if (judgementCanvas && j.noteImage){
       const ctx = judgementCanvas.getContext('2d');
       if (ctx){
@@ -3196,6 +3244,16 @@ function syncJudgementUI(){
         };
         img.src = j.noteImage;
       }
+    }
+    if (j.revealedAt && judgementRevealHandledAt !== j.revealedAt){
+      judgementRevealHandledAt = j.revealedAt;
+      setTimeout(async () => {
+        const latest = getJudgement();
+        if (!latest?.active || latest.phase !== 'reveal') return;
+        await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
+        await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+        await advanceTurnToNextPlayer();
+      }, 2000);
     }
   }
 }
@@ -3281,22 +3339,20 @@ async function pickJudgementTarget(targetId){
   });
 }
 
-btnJudgementCloseYes?.addEventListener('click', async (e) => {
+btnJudgementWriteYes?.addEventListener('click', async (e) => {
   e.preventDefault();
   const j = getJudgement();
   if (!j?.active || j.phase !== 'writing') return;
   if (j.kiraId !== state.userId) return;
+  if (!judgementHasStroke) return;
   const noteImage = judgementCanvas ? judgementCanvas.toDataURL('image/png') : null;
 
   await update(ref(db, `rooms/${state.roomCode}/judgement`), {
-    active:false,
     phase:'reveal',
     showNote:true,
     noteImage,
     revealedAt: Date.now()
   });
-  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
-  await advanceTurnToNextPlayer();
 });
 
 function bindJudgementCanvas(){
@@ -3318,6 +3374,12 @@ function bindJudgementCanvas(){
     ctx.lineTo(e.offsetX, e.offsetY);
     ctx.stroke();
     judgementLastPoint = { x: e.offsetX, y: e.offsetY };
+    if (!judgementHasStroke){
+      judgementHasStroke = true;
+      if (getJudgement()?.phase === 'writing' && getJudgement()?.kiraId === state.userId){
+        showJudgementWritePop(true);
+      }
+    }
   };
   const endDraw = () => { judgementLastPoint = null; };
 
