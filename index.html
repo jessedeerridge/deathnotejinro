@@ -222,7 +222,6 @@
     transform-origin:top center;
   }
   .player-tag .mini-hand-circle{
-    position:absolute;
     left:50%;
     top:50%;
     width:66px;
@@ -231,6 +230,9 @@
     border:1px solid rgba(17,17,17,.28);
     border-radius:50%;
     pointer-events:none;
+    box-sizing:border-box;
+    overflow:visible;
+    isolation:isolate;
     z-index:1;
   }
   .player-circle.judgement-spotlight .mini-hand-circle{
@@ -239,9 +241,19 @@
   }
   .player-circle.judgement-spotlight-kira .mini-hand-circle{
     box-shadow:0 0 0 9999px rgba(0,0,0,.96);
-    background:rgba(255,255,255,.06);
-    backdrop-filter:blur(2px);
+    background:rgba(255,255,255,.08);
+    backdrop-filter:blur(1px);
     z-index:5;
+  }
+  .player-circle.judgement-spotlight-kira .mini-hand-circle::before{
+    content:'';
+    position:absolute;
+    inset:-6px;
+    border-radius:50%;
+    box-shadow:0 0 18px 8px rgba(0,0,0,.7);
+    filter:blur(2px);
+    pointer-events:none;
+    z-index:-1;
   }
   .player-tag .mini-card{
     position:absolute;left:50%;top:0;width:24px;height:33px;
