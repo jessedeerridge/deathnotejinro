@@ -233,6 +233,10 @@
     pointer-events:none;
     z-index:1;
   }
+  .player-circle.judgement-spotlight .mini-hand-circle{
+    box-shadow:0 0 0 9999px rgba(0,0,0,.96);
+    z-index:5;
+  }
   .player-tag .mini-card{
     position:absolute;left:50%;top:0;width:24px;height:33px;
     border-radius:4px;border:1px solid #bbb;
@@ -660,16 +664,27 @@
     gap:0;
     z-index:12015;
     pointer-events:auto;
-    transition:width 520ms ease;
+    transition:width 0.4s ease, transform 0.4s ease;
   }
   .judgement-notebook.hidden{ display:none; }
-  .judgement-notebook.open{ width:260px; }
+  .judgement-notebook.open{
+    width:260px;
+    transform:translate(calc(-50% + 20px), -50%);
+  }
   .judgement-page{
     width:120px;
     height:170px;
     background:#f8f8f8;
     border:1px solid #111;
     box-sizing:border-box;
+    border-radius:0;
+  }
+  .judgement-page:last-child{
+    opacity:0;
+    transition:opacity 0.2s ease;
+  }
+  .judgement-notebook.open .judgement-page:last-child{
+    opacity:1;
   }
   .judgement-canvas{
     position:absolute;
@@ -3155,8 +3170,13 @@ function syncJudgementUI(){
 
   if (j.phase === 'select' || j.phase === 'writing'){
     if (!isKira()){
-      setJudgementFade(true);
+      setJudgementFade(false);
+      playerCircle.classList.add('judgement-spotlight');
+    } else {
+      playerCircle.classList.remove('judgement-spotlight');
     }
+  } else {
+    playerCircle.classList.remove('judgement-spotlight');
   }
 
   if (j.phase === 'writing' && j.kiraId === state.userId){
@@ -3172,6 +3192,17 @@ function syncJudgementUI(){
     openJudgementNotebook(false);
     setJudgementFade(false);
     showJudgementMessage(false);
+    if (judgementCanvas && j.noteImage){
+      const ctx = judgementCanvas.getContext('2d');
+      if (ctx){
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0,0,judgementCanvas.width, judgementCanvas.height);
+          ctx.drawImage(img, 0, 0, judgementCanvas.width, judgementCanvas.height);
+        };
+        img.src = j.noteImage;
+      }
+    }
   }
 }
 
@@ -3261,11 +3292,13 @@ btnJudgementCloseYes?.addEventListener('click', async (e) => {
   const j = getJudgement();
   if (!j?.active || j.phase !== 'writing') return;
   if (j.kiraId !== state.userId) return;
+  const noteImage = judgementCanvas ? judgementCanvas.toDataURL('image/png') : null;
 
   await update(ref(db, `rooms/${state.roomCode}/judgement`), {
     active:false,
     phase:'reveal',
     showNote:true,
+    noteImage,
     revealedAt: Date.now()
   });
   await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
