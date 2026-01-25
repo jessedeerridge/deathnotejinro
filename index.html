@@ -1423,6 +1423,7 @@ let judgementLastPoint = null;
 let judgementHasStroke = false;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
+let lastJudgementRoundTriggeredLocal = 0;
 let lastJudgementNoZeroAt = null;
 
 function generateRoomCode(length = 6){
@@ -3372,6 +3373,7 @@ async function startJudgementSequence(players, round){
   if (!locked.committed) return;
 
   try{
+    lastJudgementRoundTriggeredLocal = Number(round || 0);
     await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
 
     const handsSnap = await get(ref(db, `rooms/${state.roomCode}/hands`));
@@ -4373,7 +4375,10 @@ async function advanceTurnToNextPlayer(){
 
   const isLastPlayer = (idx === activePlayers.length - 1);
   const round = getCurrentRound(activePlayers.length);
-  const lastRoundTriggered = Number(state.room?.judgementMeta?.lastRound || 0);
+  const lastRoundTriggered = Math.max(
+    Number(state.room?.judgementMeta?.lastRound || 0),
+    Number(lastJudgementRoundTriggeredLocal || 0)
+  );
   if (isLastPlayer && round >= 2 && round > lastRoundTriggered){
     await startJudgementSequence(activePlayers, round);
     return;
