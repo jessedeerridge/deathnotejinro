@@ -618,18 +618,23 @@
     z-index:12005;
     pointer-events:none;
   }
-  .judgement-fade.active{ opacity:0.85; }
+  .judgement-fade.active{ opacity:0.96; }
   .judgement-message{
     position:fixed;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:900;
-    font-size:20px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(10,10,10,.95);
     color:#fff;
+    padding:12px 16px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 18px 40px rgba(0,0,0,.45);
+    font-weight:900;
+    font-size:16px;
     z-index:12012;
     pointer-events:none;
+    white-space:nowrap;
   }
   .judgement-message.hidden{ display:none; }
 
@@ -3137,7 +3142,11 @@ function syncJudgementUI(){
     showJudgementMessage(false);
     setTimeout(() => {
       showJudgementMessage(true);
-      setJudgementFade(false);
+      setTimeout(() => {
+        showJudgementMessage(false);
+        setJudgementFade(false);
+        finishJudgementNoZero().catch(console.warn);
+      }, 1200);
     }, 5000);
   }
 
@@ -3207,9 +3216,7 @@ async function startJudgementSequence(players){
     });
 
     if (!kiraHasZero){
-      setTimeout(() => {
-        finishJudgementNoZero().catch(console.warn);
-      }, 6500);
+      // handled by syncJudgementUI timing
     }
   } finally {
     await set(ref(db, `rooms/${state.roomCode}/judgementLock`), null);
