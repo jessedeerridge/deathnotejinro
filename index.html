@@ -221,6 +221,18 @@
     width:60px;height:30px;pointer-events:none;
     transform-origin:top center;
   }
+  .player-tag .mini-hand-circle{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:66px;
+    height:66px;
+    transform:translate(-50%,-50%);
+    border:1px solid rgba(17,17,17,.28);
+    border-radius:50%;
+    pointer-events:none;
+    z-index:1;
+  }
   .player-tag .mini-card{
     position:absolute;left:50%;top:0;width:24px;height:33px;
     border-radius:4px;border:1px solid #bbb;
@@ -1356,12 +1368,12 @@ function updateGun2Link(){
     return;
   }
 
-  const byEl = getPlayerTagEl(g.by);
-  const tgEl = getPlayerTagEl(g.targetId);
-  if (!byEl){
-    clearGun2Layer();
-    return;
-  }
+    const byEl = getPlayerTagEl(g.by);
+    const tgEl = getPlayerTagEl(g.targetId);
+    if (!byEl){
+      clearGun2Layer();
+      return;
+    }
 
   const pcRect = playerCircle.getBoundingClientRect();
   const br = byEl.getBoundingClientRect();
@@ -1385,9 +1397,24 @@ function updateGun2Link(){
       y2 = (hr.top + 8) - pcRect.top;
     }
   } else if (tgEl){
-    const tr = tgEl.getBoundingClientRect();
-    x2 = (tr.left + tr.width/2) - pcRect.left;
-    y2 = (tr.top  + tr.height) - pcRect.top + 2;
+    const circleEl = tgEl.querySelector('.mini-hand-circle');
+    if (circleEl){
+      const cr = circleEl.getBoundingClientRect();
+      const cx = (cr.left + cr.width/2) - pcRect.left;
+      const cy = (cr.top + cr.height/2) - pcRect.top;
+      const dx = cx - x1;
+      const dy = cy - y1;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const radius = Math.min(cr.width, cr.height) / 2 + 2;
+      const ux = dx / dist;
+      const uy = dy / dist;
+      x2 = cx - ux * radius;
+      y2 = cy - uy * radius;
+    } else {
+      const tr = tgEl.getBoundingClientRect();
+      x2 = (tr.left + tr.width/2) - pcRect.left;
+      y2 = (tr.top  + tr.height) - pcRect.top + 2;
+    }
   } else {
     clearGun2Layer();
     return;
@@ -3900,6 +3927,9 @@ function renderPlayerCircle(players){
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
+      const miniCircle = document.createElement('div');
+      miniCircle.className = 'mini-hand-circle';
+      miniHand.appendChild(miniCircle);
 
       // ★ 5：使用者だけ、左に正体カード裏を置く（mini-handの中に置く）
       if (iAmWitnessBy){
@@ -3976,6 +4006,9 @@ function renderPlayerCircle(players){
       if (iAmWitnessBy && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
+        const miniCircle = document.createElement('div');
+        miniCircle.className = 'mini-hand-circle';
+        miniHand.appendChild(miniCircle);
         const idBack = document.createElement('div');
         idBack.className = 'witness-id-back';
         idBack.title = '正体カード（裏）';
@@ -3988,6 +4021,9 @@ function renderPlayerCircle(players){
       } else if (iAmGun2By && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
+        const miniCircle = document.createElement('div');
+        miniCircle.className = 'mini-hand-circle';
+        miniHand.appendChild(miniCircle);
         tag.appendChild(miniHand);
       } else {
         // 他人側：対象だけ裏を表示
@@ -3996,6 +4032,9 @@ function renderPlayerCircle(players){
         if (showThisBack && p.id !== state.userId){
           const miniHand = document.createElement('div');
           miniHand.className = 'mini-hand';
+          const miniCircle = document.createElement('div');
+          miniCircle.className = 'mini-hand-circle';
+          miniHand.appendChild(miniCircle);
           const idBack = document.createElement('div');
           idBack.className = 'witness-id-back';
           idBack.title = '正体カード（裏）';
