@@ -682,6 +682,7 @@
     gap:0;
     z-index:12015;
     pointer-events:auto;
+    overflow:hidden;
     transition:width 0.4s ease, transform 0.4s ease;
   }
   .judgement-notebook.hidden{ display:none; }
@@ -699,10 +700,14 @@
   }
   .judgement-page:last-child{
     opacity:0;
-    transition:opacity 0.2s ease;
+    transform:translateX(-10px) scaleX(0.04);
+    transform-origin:left center;
+    transition:opacity 0.2s ease, transform 0.32s ease;
   }
   .judgement-notebook.open .judgement-page:last-child{
     opacity:1;
+    transform:translateX(0) scaleX(1);
+    transition-delay:0.08s;
   }
   .judgement-canvas{
     position:absolute;
