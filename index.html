@@ -233,16 +233,6 @@
     pointer-events:none;
     z-index:1;
   }
-  .player-circle.judgement-spotlight .mini-hand-circle{
-    box-shadow:0 0 0 9999px rgba(0,0,0,.96);
-    z-index:5;
-  }
-  .player-circle.judgement-spotlight-kira .mini-hand-circle{
-    box-shadow:0 0 0 9999px rgba(0,0,0,.96);
-    background:rgba(255,255,255,.06);
-    backdrop-filter:blur(2px);
-    z-index:5;
-  }
   .player-tag .mini-card{
     position:absolute;left:50%;top:0;width:24px;height:33px;
     border-radius:4px;border:1px solid #bbb;
@@ -460,6 +450,28 @@
     /* mini-hand(60px幅)の左外に半分出す感じ */
     margin-left:-40px;
   }
+  .judgement-id-face{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.45);
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    font-size:10px;
+    font-weight:900;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    z-index:55;
+  }
+  .player-tag .judgement-id-face{
+    margin-left:-40px;
+  }
 
   .witness-layer{
     position:absolute;
@@ -670,6 +682,7 @@
     gap:0;
     z-index:12015;
     pointer-events:auto;
+    overflow:hidden;
     transition:width 0.4s ease, transform 0.4s ease;
   }
   .judgement-notebook.hidden{ display:none; }
@@ -687,10 +700,14 @@
   }
   .judgement-page:last-child{
     opacity:0;
-    transition:opacity 0.2s ease;
+    transform:translateX(-10px) scaleX(0.04);
+    transform-origin:left center;
+    transition:opacity 0.2s ease, transform 0.32s ease;
   }
   .judgement-notebook.open .judgement-page:last-child{
     opacity:1;
+    transform:translateX(0) scaleX(1);
+    transition-delay:0.08s;
   }
   .judgement-canvas{
     position:absolute;
@@ -698,7 +715,7 @@
     cursor:crosshair;
   }
 
-  .judgement-close-pop{
+  .judgement-confirm-pop{
     position:fixed;
     left:50%;
     bottom:14px;
@@ -716,8 +733,8 @@
     min-width:280px;
     justify-content:space-between;
   }
-  .judgement-close-pop.hidden{ display:none; }
-  .judgement-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+  .judgement-confirm-pop.hidden{ display:none; }
+  .judgement-confirm-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
   .my-hand-wrapper{margin-top:16px;text-align:center;}
   .my-hand-title{display:none;}
@@ -1081,9 +1098,12 @@
   <div class="judgement-page"></div>
   <canvas id="judgementCanvas" class="judgement-canvas"></canvas>
 </div>
-<div id="judgementClosePop" class="judgement-close-pop hidden" aria-hidden="true">
-  <div class="msg">閉じてもいいですか？</div>
-  <button id="btnJudgementCloseYes" class="btn primary">はい</button>
+<div id="judgementTargetPop" class="judgement-confirm-pop hidden" aria-hidden="true">
+  <div class="msg" id="judgementTargetMessage">選んだプレイヤーの名前を書いてください。</div>
+</div>
+<div id="judgementWritePop" class="judgement-confirm-pop hidden" aria-hidden="true">
+  <div class="msg">書きましたか？</div>
+  <button id="btnJudgementWriteYes" class="btn primary">はい</button>
 </div>
 
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
@@ -1212,6 +1232,7 @@ const state = {
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
   judgement: null,     // ★ 裁き
+  eliminated: {},      // ★ 脱落
 };
 
 const mainEl = document.getElementById('main');
@@ -1298,8 +1319,10 @@ const judgementFade = document.getElementById('judgementFade');
 const judgementMessage = document.getElementById('judgementMessage');
 const judgementNotebook = document.getElementById('judgementNotebook');
 const judgementCanvas = document.getElementById('judgementCanvas');
-const judgementClosePop = document.getElementById('judgementClosePop');
-const btnJudgementCloseYes = document.getElementById('btnJudgementCloseYes');
+const judgementTargetPop = document.getElementById('judgementTargetPop');
+const judgementTargetMessage = document.getElementById('judgementTargetMessage');
+const judgementWritePop = document.getElementById('judgementWritePop');
+const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 
 /* ===== カード説明 ===== */
 const ROLE_HELP = [
@@ -1357,6 +1380,9 @@ let gun2ConfirmPending = false;
 let judgementPopAnimating = false;
 let judgementDrawActive = false;
 let judgementLastPoint = null;
+let judgementHasStroke = false;
+let judgementRevealHandledAt = null;
+let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 
 function generateRoomCode(length = 6){
@@ -1434,11 +1460,13 @@ function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' |
 function isPolice(){ const id = getMyIdentity(); return id === '警察1' || id === '警察2'; }
 function isJudgementActive(){ return !!state.judgement?.active; }
 function getJudgement(){ return (state.judgement && typeof state.judgement === 'object') ? state.judgement : null; }
+function isEliminated(playerId){ return !!state.eliminated?.[playerId]; }
 
 function calcIsPlayable(){
   const myId = state.userId;
   const hand = state.hands[myId];
   const count = Array.isArray(hand?.cards) ? hand.cards.length : 0;
+  if (isEliminated(myId)) return false;
 
   const invActive = isInvestigationActive();
   const exActive  = isExchangeActive();
@@ -1980,6 +2008,14 @@ function subscribeDiscard(){
   onValue(dRef, snap => {
     state.discard = snap.val() || [];
     renderDiscardCenter();
+  });
+}
+
+function subscribeEliminated(){
+  const elimRef = ref(db, `rooms/${state.roomCode}/eliminated`);
+  onValue(elimRef, snap => {
+    state.eliminated = snap.val() || {};
+    renderHands();
   });
 }
 
@@ -3122,9 +3158,25 @@ function setJudgementFade(active){
   judgementFade.classList.toggle('active', active);
 }
 
+
 function showJudgementMessage(show){
   if (!judgementMessage) return;
   judgementMessage.classList.toggle('hidden', !show);
+}
+
+function showJudgementTargetPop(show, message){
+  if (!judgementTargetPop) return;
+  if (judgementTargetMessage && message){
+    judgementTargetMessage.textContent = message;
+  }
+  judgementTargetPop.classList.toggle('hidden', !show);
+  judgementTargetPop.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function showJudgementWritePop(show){
+  if (!judgementWritePop) return;
+  judgementWritePop.classList.toggle('hidden', !show);
+  judgementWritePop.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
 
 function openJudgementNotebook(enableDraw){
@@ -3146,12 +3198,15 @@ function syncJudgementUI(){
   if (!hasActive){
     setJudgementFade(false);
     showJudgementMessage(false);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
+    judgementLastTargetId = null;
+    judgementRevealHandledAt = null;
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
     }
-    judgementClosePop?.classList.add('hidden');
-    judgementClosePop?.setAttribute('aria-hidden','true');
     return;
   }
 
@@ -3164,6 +3219,9 @@ function syncJudgementUI(){
     lastJudgementNoZeroAt = j.at || Date.now();
     setJudgementFade(true);
     showJudgementMessage(false);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
     setTimeout(() => {
       showJudgementMessage(true);
       setTimeout(() => {
@@ -3175,32 +3233,45 @@ function syncJudgementUI(){
   }
 
   if (j.phase === 'select' || j.phase === 'writing'){
-    setJudgementFade(true);
-    if (isKira()){
-      playerCircle.classList.add('judgement-spotlight-kira');
-      playerCircle.classList.remove('judgement-spotlight');
+    const isActiveKira = isKira() && j.kiraId === state.userId;
+    setJudgementFade(!isActiveKira);
+    playerCircle.classList.remove('judgement-spotlight');
+    if (j.phase === 'writing' && isActiveKira){
+      const targetName = state.players?.find((p) => p.id === j.targetId)?.name || '対象プレイヤー';
+      if (judgementLastTargetId !== j.targetId){
+        judgementHasStroke = false;
+        showJudgementWritePop(false);
+        judgementLastTargetId = j.targetId || null;
+        if (judgementCanvas){
+          const ctx = judgementCanvas.getContext('2d');
+          ctx?.clearRect(0, 0, judgementCanvas.width, judgementCanvas.height);
+        }
+      }
+      showJudgementTargetPop(true, `${targetName}の名前を書いてください。`);
+      showJudgementWritePop(judgementHasStroke);
     } else {
-      playerCircle.classList.remove('judgement-spotlight');
-      playerCircle.classList.remove('judgement-spotlight-kira');
+      showJudgementTargetPop(false);
+      showJudgementWritePop(false);
+      judgementHasStroke = false;
     }
   } else {
     playerCircle.classList.remove('judgement-spotlight');
-    playerCircle.classList.remove('judgement-spotlight-kira');
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
+    judgementHasStroke = false;
+    judgementLastTargetId = null;
   }
 
   if (j.phase === 'writing' && j.kiraId === state.userId){
     openJudgementNotebook(true);
-    judgementClosePop?.classList.remove('hidden');
-    judgementClosePop?.setAttribute('aria-hidden','false');
-  } else {
-    judgementClosePop?.classList.add('hidden');
-    judgementClosePop?.setAttribute('aria-hidden','true');
   }
 
   if (j.phase === 'reveal' || j.showNote){
     openJudgementNotebook(false);
     setJudgementFade(false);
     showJudgementMessage(false);
+    showJudgementTargetPop(false);
+    showJudgementWritePop(false);
     if (judgementCanvas && j.noteImage){
       const ctx = judgementCanvas.getContext('2d');
       if (ctx){
@@ -3211,6 +3282,16 @@ function syncJudgementUI(){
         };
         img.src = j.noteImage;
       }
+    }
+    if (j.revealedAt && judgementRevealHandledAt !== j.revealedAt){
+      judgementRevealHandledAt = j.revealedAt;
+      setTimeout(async () => {
+        const latest = getJudgement();
+        if (!latest?.active || latest.phase !== 'reveal') return;
+        await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
+        await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+        await advanceTurnToNextPlayer();
+      }, 2000);
     }
   }
 }
@@ -3296,22 +3377,91 @@ async function pickJudgementTarget(targetId){
   });
 }
 
-btnJudgementCloseYes?.addEventListener('click', async (e) => {
+async function executeJudgementElimination(targetId){
+  if (!state.roomCode) return;
+  if (!targetId) return;
+  const identity = state.hands?.[targetId]?.identity || '？';
+  const token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const elimRef = ref(db, `rooms/${state.roomCode}/eliminated/${targetId}`);
+
+  const res = await runTransaction(elimRef, (cur) => {
+    if (cur?.discardedAt) return cur;
+    if (cur?.discardToken) return cur;
+    if (cur){
+      return {
+        ...cur,
+        identity: cur.identity || identity,
+        discardToken: token,
+        by: cur.by || state.userId,
+        at: cur.at || Date.now(),
+        source: cur.source || 'judgement'
+      };
+    }
+    return {
+      by: state.userId,
+      at: Date.now(),
+      source: 'judgement',
+      identity,
+      discardToken: token
+    };
+  }, { applyLocally:false });
+
+  const record = res.snapshot.val();
+  if (!record || record.discardToken !== token) return;
+
+  await discardHandSequentially(targetId, state.userId);
+  await update(elimRef, {
+    discardedAt: Date.now(),
+    discardToken: null
+  });
+}
+
+async function discardHandSequentially(targetId, byId){
+  const cardsRef = ref(db, `rooms/${state.roomCode}/hands/${targetId}/cards`);
+  const discardRef = ref(db, `rooms/${state.roomCode}/discard`);
+
+  while (true){
+    const snap = await get(cardsRef);
+    const cards = snap.val();
+    const list = Array.isArray(cards) ? cards : [];
+    if (!list.length) break;
+    const cardValue = String(list[0]);
+
+    await runTransaction(cardsRef, (cur) => {
+      const arr = Array.isArray(cur) ? [...cur] : [];
+      if (!arr.length) return arr;
+      arr.shift();
+      return arr;
+    }, { applyLocally:false });
+
+    await runTransaction(discardRef, (cur) => {
+      const arr = Array.isArray(cur) ? [...cur] : [];
+      arr.push({ by: byId, card: cardValue, at: Date.now(), reason: 'judgement' });
+      return arr;
+    }, { applyLocally:false });
+
+    await sleep(1000);
+  }
+}
+
+btnJudgementWriteYes?.addEventListener('click', async (e) => {
   e.preventDefault();
   const j = getJudgement();
   if (!j?.active || j.phase !== 'writing') return;
   if (j.kiraId !== state.userId) return;
+  if (!judgementHasStroke) return;
+  const targetId = j.targetId;
   const noteImage = judgementCanvas ? judgementCanvas.toDataURL('image/png') : null;
 
   await update(ref(db, `rooms/${state.roomCode}/judgement`), {
-    active:false,
     phase:'reveal',
     showNote:true,
     noteImage,
     revealedAt: Date.now()
   });
-  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
-  await advanceTurnToNextPlayer();
+  if (targetId){
+    executeJudgementElimination(targetId).catch(console.warn);
+  }
 });
 
 function bindJudgementCanvas(){
@@ -3333,6 +3483,12 @@ function bindJudgementCanvas(){
     ctx.lineTo(e.offsetX, e.offsetY);
     ctx.stroke();
     judgementLastPoint = { x: e.offsetX, y: e.offsetY };
+    if (!judgementHasStroke){
+      judgementHasStroke = true;
+      if (getJudgement()?.phase === 'writing' && getJudgement()?.kiraId === state.userId){
+        showJudgementWritePop(true);
+      }
+    }
   };
   const endDraw = () => { judgementLastPoint = null; };
 
@@ -3599,6 +3755,10 @@ async function maybeAutoDrawAtTurnStart(){
   if (autoDrawInFlight) return;
   if (state.turn.drawn) return;
   if (state.turn.paused) return;
+  if (isEliminated(state.userId)){
+    await advanceTurnToNextPlayer();
+    return;
+  }
   if (isInvestigationActive()) return;
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
@@ -4076,17 +4236,18 @@ async function advanceTurnToNextPlayer(){
   if (isGun2Active()) return;
 
   const players = await getSeatedPlayers();
-  if (!players.length) return;
+  const activePlayers = players.filter(p => !isEliminated(p.id));
+  if (!activePlayers.length) return;
 
-  const currentId = state.turn.currentPlayerId || players[0].id;
-  const idx = players.findIndex(p => p.id === currentId);
-  const next = players[(idx >= 0 ? idx + 1 : 0) % players.length];
+  const currentId = state.turn.currentPlayerId || activePlayers[0].id;
+  const idx = activePlayers.findIndex(p => p.id === currentId);
+  const next = activePlayers[(idx >= 0 ? idx + 1 : 0) % activePlayers.length];
 
-  const isLastPlayer = (idx === players.length - 1);
-  const round = getCurrentRound(players.length);
+  const isLastPlayer = (idx === activePlayers.length - 1);
+  const round = getCurrentRound(activePlayers.length);
   const lastRoundTriggered = Number(state.room?.judgementMeta?.lastRound || 0);
   if (isLastPlayer && round >= 2 && round > lastRoundTriggered){
-    await startJudgementSequence(players, round);
+    await startJudgementSequence(activePlayers, round);
     return;
   }
 
@@ -4142,6 +4303,7 @@ btnJoin.addEventListener('click', async () => {
   subscribeHands();
   subscribeDeck();
   subscribeDiscard();
+  subscribeEliminated();
   subscribeTurn();
   subscribeDrawEvent();
   subscribeReshuffleEvent();
@@ -4427,6 +4589,8 @@ function renderPlayerCircle(players){
     }
 
     const handData = state.hands[p.id];
+    const eliminated = isEliminated(p.id);
+    const eliminatedIdentity = state.eliminated?.[p.id]?.identity || handData?.identity || '？';
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     let gun2RevealIdx = null;
@@ -4452,6 +4616,13 @@ function renderPlayerCircle(players){
       const miniCircle = document.createElement('div');
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
+
+      if (eliminated){
+        const idFace = document.createElement('div');
+        idFace.className = 'judgement-id-face';
+        idFace.textContent = eliminatedIdentity;
+        miniHand.appendChild(idFace);
+      }
 
       // ★ 5：使用者だけ、左に正体カード裏を置く（mini-handの中に置く）
       if (iAmWitnessBy){
@@ -4540,6 +4711,17 @@ function renderPlayerCircle(players){
         });
         miniHand.appendChild(idBack);
         tag.appendChild(miniHand);
+      } else if (eliminated && p.id !== state.userId){
+        const miniHand = document.createElement('div');
+        miniHand.className = 'mini-hand';
+        const miniCircle = document.createElement('div');
+        miniCircle.className = 'mini-hand-circle';
+        miniHand.appendChild(miniCircle);
+        const idFace = document.createElement('div');
+        idFace.className = 'judgement-id-face';
+        idFace.textContent = eliminatedIdentity;
+        miniHand.appendChild(idFace);
+        tag.appendChild(miniHand);
       } else if (iAmGun2By && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
@@ -4607,7 +4789,7 @@ function buildDeckForPlayers(playerCount){
   const deck = [];
 
   if (playerCount <= 4){
-    pushN(deck, 0, 8);
+    pushN(deck, 0, 50);
     pushN(deck, 1, 1);
     pushN(deck, 2, 1);
     pushN(deck, 3, 1);
@@ -4712,6 +4894,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/hands`), hands),
     set(ref(db, `rooms/${state.roomCode}/deck`), deckRaw.map(String)),
     set(ref(db, `rooms/${state.roomCode}/discard`), []),
+    set(ref(db, `rooms/${state.roomCode}/eliminated`), null),
     set(ref(db, `rooms/${state.roomCode}/turn`), { currentPlayerId:firstPlayerId, turnSeq:1, drawn:true, paused:false, updatedAt:Date.now() }),
     set(ref(db, `rooms/${state.roomCode}/investigation`), null),
     set(ref(db, `rooms/${state.roomCode}/transferEvent`), null),
@@ -4753,6 +4936,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/hands`)),
     remove(ref(db, `${base}/deck`)),
     remove(ref(db, `${base}/discard`)),
+    remove(ref(db, `${base}/eliminated`)),
     remove(ref(db, `${base}/turn`)),
     remove(ref(db, `${base}/drawEvent`)),
     remove(ref(db, `${base}/reshuffleEvent`)),
