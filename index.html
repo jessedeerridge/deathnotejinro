@@ -556,6 +556,18 @@
     box-shadow:0 6px 16px rgba(0,0,0,.22);
   }
 
+  /* ★ 裁き（4の公開） */
+  .mini-card.judgement4-face{
+    background:#fff;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    font-size:12px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
+  }
+
   .shinigami-close-pop{
     position:fixed;
     left:50%;
@@ -1480,10 +1492,11 @@ function calcIsPlayable(){
    ========================= */
 function updateTurnHandEmphasisOnTags(){
   const current = state.turn?.currentPlayerId || null;
+  const judgementActive = isJudgementActive();
   const tags = playerCircle.querySelectorAll('.player-tag');
   tags.forEach(tag => {
     const pid = tag.dataset.pid || '';
-    const should = !!current && pid === current && pid !== state.userId;
+    const should = !!current && pid === current && pid !== state.userId && !judgementActive;
     tag.classList.toggle('turn-hand', should);
   });
 }
@@ -3376,6 +3389,20 @@ async function executeJudgementElimination(targetId){
   if (!state.roomCode) return;
   if (!targetId) return;
   const identity = state.hands?.[targetId]?.identity || '？';
+  const cardsSnap = await get(ref(db, `rooms/${state.roomCode}/hands/${targetId}/cards`));
+  const cards = cardsSnap.val();
+  const cardList = Array.isArray(cards) ? cards.map(String) : [];
+  const hasFour = cardList.includes('4');
+
+  const countRef = ref(db, `rooms/${state.roomCode}/judgementMeta/targetCounts/${targetId}`);
+  const countRes = await runTransaction(countRef, (cur) => {
+    const next = Number(cur || 0) + 1;
+    return next;
+  }, { applyLocally:false });
+  const selectionCount = Number(countRes.snapshot.val() || 0);
+  const shouldEliminate = !hasFour || selectionCount >= 2;
+  if (!shouldEliminate) return;
+
   const token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const elimRef = ref(db, `rooms/${state.roomCode}/eliminated/${targetId}`);
 
@@ -4498,6 +4525,7 @@ function renderPlayerCircle(players){
   const playerNameMap = new Map(players.map(p => [p.id, p.name]));
   const sh = getShinigami13();
   const g = getGun2();
+  const j = getJudgement();
   const iAmGun2By = !!(g?.active && g?.phase === 'pickTarget' && g?.by === state.userId);
 
   players.forEach((p, idx) => {
@@ -4552,7 +4580,6 @@ function renderPlayerCircle(players){
       });
     }
 
-    const j = getJudgement();
     const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
     if (isJudgementSelecting && p.id !== state.userId){
       tag.classList.add('judgement-targetable');
@@ -4588,8 +4615,10 @@ function renderPlayerCircle(players){
     const eliminatedIdentity = state.eliminated?.[p.id]?.identity || handData?.identity || '？';
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
+    const showJudgement4Reveal = !!(j?.active && j?.phase === 'reveal' && j?.targetId === p.id);
     let gun2RevealIdx = null;
     let gun2RevealCard = null;
+    let judgement4RevealIdx = null;
     if (showGun2Reveal){
       const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
       const pickIdx = Number(g?.targetPick?.idx);
@@ -4603,6 +4632,13 @@ function renderPlayerCircle(players){
           gun2RevealIdx = pos;
           gun2RevealCard = pickCard;
         }
+      }
+    }
+    if (showJudgement4Reveal){
+      const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
+      const pos = handCards.indexOf('4');
+      if (pos >= 0){
+        judgement4RevealIdx = pos;
       }
     }
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
@@ -4666,6 +4702,11 @@ function renderPlayerCircle(players){
         } else if (showGun2Reveal && Number.isFinite(Number(gun2RevealIdx)) && idx2 === Number(gun2RevealIdx)){
           card.classList.add('gun2-face');
           card.textContent = gun2RevealCard ?? '';
+          card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
+          card.style.zIndex = String(200 + idx2);
+        } else if (showJudgement4Reveal && Number.isFinite(Number(judgement4RevealIdx)) && idx2 === Number(judgement4RevealIdx)){
+          card.classList.add('judgement4-face');
+          card.textContent = '4';
           card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
           card.style.zIndex = String(200 + idx2);
         }
