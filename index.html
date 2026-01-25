@@ -1358,20 +1358,40 @@ function updateGun2Link(){
 
   const byEl = getPlayerTagEl(g.by);
   const tgEl = getPlayerTagEl(g.targetId);
-  if (!byEl || !tgEl){
+  if (!byEl){
     clearGun2Layer();
     return;
   }
 
   const pcRect = playerCircle.getBoundingClientRect();
   const br = byEl.getBoundingClientRect();
-  const tr = tgEl.getBoundingClientRect();
 
   const x1 = (br.left + br.width/2) - pcRect.left;
   const y1 = (br.top  + br.height/2) - pcRect.top;
 
-  const x2 = (tr.left + tr.width/2) - pcRect.left;
-  const y2 = (tr.top  + tr.height) - pcRect.top + 6;
+  let x2 = x1;
+  let y2 = y1;
+
+  if (g.targetId === state.userId){
+    const idx = Number(g?.targetPick?.idx);
+    const myCard = Number.isFinite(idx) ? myHandEl?.querySelector(`.my-card[data-index="${idx}"]`) : null;
+    if (myCard){
+      const cr = myCard.getBoundingClientRect();
+      x2 = (cr.left + cr.width/2) - pcRect.left;
+      y2 = (cr.top  + cr.height/2) - pcRect.top;
+    } else if (myHandEl){
+      const hr = myHandEl.getBoundingClientRect();
+      x2 = (hr.left + hr.width/2) - pcRect.left;
+      y2 = (hr.top + 8) - pcRect.top;
+    }
+  } else if (tgEl){
+    const tr = tgEl.getBoundingClientRect();
+    x2 = (tr.left + tr.width/2) - pcRect.left;
+    y2 = (tr.top  + tr.height) - pcRect.top + 2;
+  } else {
+    clearGun2Layer();
+    return;
+  }
 
   const width = Math.max(1, pcRect.width);
   const height = Math.max(1, pcRect.height);
