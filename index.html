@@ -471,21 +471,16 @@
   .witness-close-pop.hidden{ display:none; }
   .witness-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
-  /* ★ 13：死神（0カード公開） */
-  .shinigami-reveal-card{
-    position:absolute;
-    left:50%;
-    top:-10px;
-    width:24px;height:33px;
-    border-radius:4px;
-    border:1px solid rgba(0,0,0,.25);
+  /* ★ 13：死神（扇手札の1枚を表で0表示） */
+  .mini-card.shinigami-face{
     background:#fff;
-    display:flex;align-items:center;justify-content:center;
-    font-weight:900;font-size:14px;color:#111;
-    box-shadow:0 8px 18px rgba(0,0,0,.25);
-    transform:translate(-50%,0) scale(1.5);
-    z-index:60;
-    pointer-events:none;
+    color:#111;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    font-size:12px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
   }
 
   .shinigami-close-pop{
@@ -3619,6 +3614,12 @@ function renderPlayerCircle(players){
         card.style.setProperty('--rot', `${angleDeg}deg`);
         card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg)`;
         card.style.zIndex = String(10 + idx2);
+
+        if (showShinigamiReveal && Number.isFinite(Number(sh?.zeroIndex)) && idx2 === Number(sh.zeroIndex)){
+          card.classList.add('shinigami-face');
+          card.textContent = '0';
+        }
+
         miniHand.appendChild(card);
 
         // ★ 6（監視）：mini-cardクリックでも対象選択できる（使用者だけ）
@@ -3629,13 +3630,6 @@ function renderPlayerCircle(players){
           });
         }
       });
-
-      if (showShinigamiReveal){
-        const reveal = document.createElement('div');
-        reveal.className = 'shinigami-reveal-card';
-        reveal.textContent = '0';
-        miniHand.appendChild(reveal);
-      }
 
       tag.appendChild(miniHand);
     } else {
@@ -3666,14 +3660,6 @@ function renderPlayerCircle(players){
           idBack.style.cursor = 'default';
           idBack.style.pointerEvents = 'none';
           miniHand.appendChild(idBack);
-          tag.appendChild(miniHand);
-        } else if (showShinigamiReveal && p.id !== state.userId){
-          const miniHand = document.createElement('div');
-          miniHand.className = 'mini-hand';
-          const reveal = document.createElement('div');
-          reveal.className = 'shinigami-reveal-card';
-          reveal.textContent = '0';
-          miniHand.appendChild(reveal);
           tag.appendChild(miniHand);
         }
       }
