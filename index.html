@@ -555,6 +555,34 @@
   .shinigami-close-pop.hidden{ display:none; }
   .shinigami-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
+  .gun2-confirm-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:10px 12px;
+    z-index:12022;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:280px;
+    justify-content:space-between;
+  }
+  .gun2-confirm-pop.hidden{ display:none; }
+  .gun2-confirm-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+  .btn[disabled],
+  .btn.disabled{
+    background:#e5e7eb;
+    color:#9ca3af;
+    border-color:#d1d5db;
+    cursor:not-allowed;
+  }
+
   .my-hand-wrapper{margin-top:16px;text-align:center;}
   .my-hand-title{display:none;}
   .my-hand-row{
@@ -900,6 +928,15 @@
   <button id="btnShinigamiCloseYes" class="btn primary">はい</button>
 </div>
 
+<!-- ★ 2：使用確認ポップ（使用者だけ） -->
+<div id="gun2ConfirmPop" class="gun2-confirm-pop hidden" aria-hidden="true">
+  <div class="msg">2を使用しますか？</div>
+  <div class="dialog-buttons">
+    <button id="btnGun2No" class="btn ghost">いいえ</button>
+    <button id="btnGun2Yes" class="btn primary">はい</button>
+  </div>
+</div>
+
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
@@ -1100,6 +1137,11 @@ const btnWitnessCloseYes = document.getElementById('btnWitnessCloseYes');
 const shinigamiClosePop = document.getElementById('shinigamiClosePop');
 const btnShinigamiCloseYes = document.getElementById('btnShinigamiCloseYes');
 
+/* ★ 2（拳銃）使用確認 */
+const gun2ConfirmPop = document.getElementById('gun2ConfirmPop');
+const btnGun2Yes = document.getElementById('btnGun2Yes');
+const btnGun2No = document.getElementById('btnGun2No');
+
 /* ===== カード説明 ===== */
 const ROLE_HELP = [
   { name: "⓪ デスノート", text: "（効果は後で実装）" },
@@ -1152,6 +1194,7 @@ let lastExchangeEventId = null;
 
 let localPicked = null;
 let localExchangePicked = null;
+let gun2ConfirmPending = false;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1225,6 +1268,7 @@ function getShinigami13(){ return (state.shinigami13 && typeof state.shinigami13
 function getMyIdentity(){ return state.hands?.[state.userId]?.identity || null; }
 function isKira(){ return getMyIdentity() === 'キラ'; }
 function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' || id === '信者'; }
+function isPolice(){ const id = getMyIdentity(); return id === '警察1' || id === '警察2'; }
 
 function calcIsPlayable(){
   const myId = state.userId;
@@ -1718,6 +1762,8 @@ function updateTurnUI(){
   syncWitnessCenterOverlay();
   // ★ 13：キラだけ閉じる
   syncShinigamiClosePop();
+  // ★ 2：使用確認
+  syncGun2ConfirmPop();
 }
 
 function updateHostUI(){
@@ -2845,6 +2891,39 @@ btnShinigamiCloseYes.addEventListener('click', async (e) => {
 });
 
 /* =========================
+   ★ 2：使用確認ポップ
+   ========================= */
+function syncGun2ConfirmPop(){
+  if (!gun2ConfirmPop) return;
+  const shouldShow = gun2ConfirmPending;
+  gun2ConfirmPop.classList.toggle('hidden', !shouldShow);
+  gun2ConfirmPop.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+
+  const canUse = isPolice();
+  if (btnGun2Yes){
+    btnGun2Yes.disabled = !canUse;
+    btnGun2Yes.classList.toggle('disabled', !canUse);
+  }
+}
+
+btnGun2Yes?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!gun2ConfirmPending) return;
+  if (!isPolice()) return;
+  gun2ConfirmPending = false;
+  syncGun2ConfirmPop();
+  await startGun2(state.userId);
+});
+
+btnGun2No?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!gun2ConfirmPending) return;
+  gun2ConfirmPending = false;
+  syncGun2ConfirmPop();
+  await advanceTurnToNextPlayer();
+});
+
+/* =========================
    ★ 7（投票）状態機械
    ========================= */
 function getVote7(){
@@ -3535,7 +3614,8 @@ async function playCardFromHand(cardIndex){
   }
 
   if (used === "2"){
-    await startGun2(myId);
+    gun2ConfirmPending = true;
+    syncGun2ConfirmPop();
     return;
   }
 
