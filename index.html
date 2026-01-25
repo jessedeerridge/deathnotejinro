@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>テンプレ</title>
+<title>デスノート人狼</title>
 <style>
   html, body{height:100%; overflow:hidden;}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fff;color:#111;}
@@ -68,6 +68,7 @@
     border:1px solid #ddd;font-size:12px;white-space:nowrap;
   }
   .player-tag.me{ background:#111;color:#fff;border-color:#111; }
+  .player-tag .player-name{ display:inline-block; }
 
   .center-area{
     position:absolute;
@@ -114,6 +115,19 @@
   .discard-card.face-down{
     background:linear-gradient(135deg,#e5e7eb,#cbd5f5);
     color:transparent;
+  }
+  .discard-flyer{
+    position:fixed;
+    width:60px;height:90px;border-radius:8px;
+    border:1px solid rgba(0,0,0,.18);
+    background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;font-weight:800;
+    box-shadow:0 18px 40px rgba(0,0,0,.28);
+    pointer-events:none;
+    z-index:9996;
+    transform:translate(-50%,-50%);
+    opacity:1;
   }
 
   .deck-pile{
@@ -1001,7 +1015,7 @@
 <body>
 
 <header>
-  <h1>テンプレ</h1>
+  <h1>デスノート人狼</h1>
   <div style="display:flex;align-items:center;gap:6px;">
     <div class="small" id="roomInfo"></div>
     <button class="btn ghost" id="copyLinkBtn">COPY</button>
@@ -1368,6 +1382,8 @@ let lastDrawEventId = null;
 let lastReshuffleEventId = null;
 let lastTransferEventId = null;
 let lastExchangeEventId = null;
+let lastDiscardCount = 0;
+let discardLoaded = false;
 
 let localPicked = null;
 let localExchangePicked = null;
@@ -1480,10 +1496,11 @@ function calcIsPlayable(){
    ========================= */
 function updateTurnHandEmphasisOnTags(){
   const current = state.turn?.currentPlayerId || null;
+  const isJudgement = isJudgementActive();
   const tags = playerCircle.querySelectorAll('.player-tag');
   tags.forEach(tag => {
     const pid = tag.dataset.pid || '';
-    const should = !!current && pid === current && pid !== state.userId;
+    const should = !!current && pid === current && pid !== state.userId && !isJudgement;
     tag.classList.toggle('turn-hand', should);
   });
 }
@@ -2001,8 +2018,20 @@ function subscribeDeck(){
 function subscribeDiscard(){
   const dRef = ref(db, `rooms/${state.roomCode}/discard`);
   onValue(dRef, snap => {
+    const prevCount = lastDiscardCount;
     state.discard = snap.val() || [];
     renderDiscardCenter();
+    const discList = Array.isArray(state.discard) ? state.discard : [];
+    if (!discardLoaded){
+      discardLoaded = true;
+      lastDiscardCount = discList.length;
+      return;
+    }
+    if (discList.length > prevCount){
+      const added = discList.slice(prevCount);
+      animateDiscardEntries(added);
+    }
+    lastDiscardCount = discList.length;
   });
 }
 
@@ -3229,7 +3258,8 @@ function syncJudgementUI(){
 
   if (j.phase === 'select' || j.phase === 'writing'){
     const isActiveKira = isKira() && j.kiraId === state.userId;
-    setJudgementFade(!isActiveKira);
+    const hasRevealed = !!j.revealedAt;
+    setJudgementFade(hasRevealed ? false : !isActiveKira);
     playerCircle.classList.remove('judgement-spotlight');
     if (j.phase === 'writing' && isActiveKira){
       const targetName = state.players?.find((p) => p.id === j.targetId)?.name || '対象プレイヤー';
@@ -3280,11 +3310,15 @@ function syncJudgementUI(){
     }
     if (j.revealedAt && judgementRevealHandledAt !== j.revealedAt){
       judgementRevealHandledAt = j.revealedAt;
+      const revealTargetId = j.targetId || null;
       setTimeout(async () => {
         const latest = getJudgement();
         if (!latest?.active || latest.phase !== 'reveal') return;
         await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
         await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+        if (revealTargetId){
+          await executeJudgementElimination(revealTargetId);
+        }
         await advanceTurnToNextPlayer();
       }, 2000);
     }
@@ -3431,11 +3465,11 @@ async function discardHandSequentially(targetId, byId){
 
     await runTransaction(discardRef, (cur) => {
       const arr = Array.isArray(cur) ? [...cur] : [];
-      arr.push({ by: byId, card: cardValue, at: Date.now(), reason: 'judgement' });
+      arr.push({ by: byId, targetId, card: cardValue, at: Date.now(), reason: 'judgement' });
       return arr;
     }, { applyLocally:false });
 
-    await sleep(1000);
+    await sleep(1800);
   }
 }
 
@@ -3454,9 +3488,6 @@ btnJudgementWriteYes?.addEventListener('click', async (e) => {
     noteImage,
     revealedAt: Date.now()
   });
-  if (targetId){
-    executeJudgementElimination(targetId).catch(console.warn);
-  }
 });
 
 function bindJudgementCanvas(){
@@ -3979,6 +4010,79 @@ async function animateDrawFromDeckToPlayer(playerId){
   flyer.remove();
 }
 
+function getDiscardStartPoint(targetId){
+  if (targetId === state.userId){
+    const cardEl = myHandEl?.querySelector('.my-card');
+    if (cardEl){
+      const cr = cardEl.getBoundingClientRect();
+      return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
+    }
+    const r = myHandEl?.getBoundingClientRect();
+    if (r) return { x: r.left + r.width/2, y: r.top + 18 };
+  }
+  const tag = getPlayerTagEl(targetId);
+  if (tag){
+    const miniCard = tag.querySelector('.mini-card');
+    if (miniCard){
+      const mr = miniCard.getBoundingClientRect();
+      return { x: mr.left + mr.width/2, y: mr.top + mr.height/2 };
+    }
+    const circleEl = tag.querySelector('.mini-hand-circle');
+    if (circleEl){
+      const cr = circleEl.getBoundingClientRect();
+      return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
+    }
+    const tr = tag.getBoundingClientRect();
+    return { x: tr.left + tr.width/2, y: tr.top + tr.height/2 };
+  }
+  const pc = playerCircle.getBoundingClientRect();
+  return { x: pc.left + pc.width/2, y: pc.top + pc.height/2 };
+}
+
+function getDiscardEndPoint(){
+  const dr = discardStackEl?.getBoundingClientRect();
+  if (dr){
+    return { x: dr.left + dr.width/2, y: dr.top + dr.height/2 };
+  }
+  const pc = playerCircle.getBoundingClientRect();
+  return { x: pc.left + pc.width/2, y: pc.top + pc.height/2 };
+}
+
+async function animateDiscardFlyer(entry){
+  const targetId = entry?.targetId || entry?.by;
+  if (!targetId) return;
+  const from = getDiscardStartPoint(targetId);
+  const to = getDiscardEndPoint();
+
+  const flyer = document.createElement('div');
+  flyer.className = 'discard-flyer';
+  flyer.textContent = String(entry?.card ?? '');
+  flyer.style.left = `${from.x}px`;
+  flyer.style.top  = `${from.y}px`;
+  flyer.style.transform = 'translate(-50%,-50%) rotate(-6deg) scale(1)';
+  document.body.appendChild(flyer);
+
+  await sleep(20);
+  flyer.style.transition = 'left 420ms ease, top 420ms ease, transform 420ms ease, opacity 160ms ease';
+  flyer.style.left = `${to.x}px`;
+  flyer.style.top  = `${to.y}px`;
+  flyer.style.transform = 'translate(-50%,-50%) rotate(8deg) scale(0.9)';
+  await sleep(440);
+
+  flyer.style.opacity = '0';
+  flyer.style.transform = 'translate(-50%,-50%) scale(0.6)';
+  await sleep(180);
+  flyer.remove();
+}
+
+function animateDiscardEntries(entries){
+  entries.forEach((entry, idx) => {
+    setTimeout(() => {
+      animateDiscardFlyer(entry).catch(console.warn);
+    }, idx * 180);
+  });
+}
+
 /* ★ リシャッフル演出（全員） */
 async function animateReshuffleDiscardToDeck(count){
   if (!deckPile) return;
@@ -4163,7 +4267,7 @@ async function playCardFromHand(cardIndex){
   const discardRef = ref(db, `rooms/${state.roomCode}/discard`);
   const ds = await get(discardRef);
   const discard = ds.val() || [];
-  await set(discardRef, [...discard, { by: myId, card: used, at: Date.now() }]);
+  await set(discardRef, [...discard, { by: myId, targetId: myId, card: used, at: Date.now(), reason: 'play' }]);
 
   if (used === "9"){
     await startInvestigationChooseDir(myId);
@@ -4509,10 +4613,13 @@ function renderPlayerCircle(players){
 
     const tag = document.createElement('div');
     tag.className = 'player-tag' + (p.id === state.userId ? ' me' : '');
-    tag.textContent = p.name;
     tag.style.left = `${x}%`;
     tag.style.top  = `${y}%`;
     tag.dataset.pid = p.id;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'player-name';
+    nameSpan.textContent = p.name;
+    tag.appendChild(nameSpan);
 
     if (invActive && invPhase() === 'pickMin'){
       const picked = !!selections?.[p.id] && Number.isFinite(Number(selections?.[p.id]?.idx));
