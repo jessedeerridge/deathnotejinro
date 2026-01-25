@@ -342,6 +342,15 @@
     overflow:visible;
   }
 
+  /* ★ 2：点線矢印＋🔫（拳銃リンク専用SVG） */
+  .gun2-layer{
+    position:absolute;
+    inset:0;
+    z-index:33;
+    pointer-events:none;
+    overflow:visible;
+  }
+
   /* ★ 6：中央拡大表示（カードのみ／ボックス無し） */
   .watch-backdrop{
     position:fixed; inset:0;
@@ -834,6 +843,8 @@
 
       <!-- ★ 8：点線矢印リンク用SVG -->
       <svg id="linkLayer" class="link-layer"></svg>
+      <!-- ★ 2：拳銃 点線矢印＋🔫 用SVG -->
+      <svg id="gun2Layer" class="gun2-layer"></svg>
       <!-- ★ 6：監視 点線矢印＋👀 用SVG -->
       <svg id="watchLayer" class="watch-layer"></svg>
       <!-- ★ 5：証人 点線矢印＋👀 用SVG -->
@@ -1032,6 +1043,7 @@ const centerArea = document.getElementById('centerArea');
 const linkLayer = document.getElementById('linkLayer');
 const watchLayer = document.getElementById('watchLayer');
 const witnessLayer = document.getElementById('witnessLayer');
+const gun2Layer = document.getElementById('gun2Layer');
 
 const discardStackEl = document.getElementById('discardStack');
 
@@ -1322,6 +1334,77 @@ function updateExchangeLink(){
 }
 
 /* =========================
+   2：点線矢印＋🔫（gun2Layer）
+   ========================= */
+let gun2LinkRaf = 0;
+function requestUpdateGun2Link(){
+  if (gun2LinkRaf) cancelAnimationFrame(gun2LinkRaf);
+  gun2LinkRaf = requestAnimationFrame(() => {
+    gun2LinkRaf = 0;
+    updateGun2Link();
+  });
+}
+function clearGun2Layer(){ clearSvgLayer(gun2Layer); }
+
+function updateGun2Link(){
+  if (!gun2Layer) return;
+
+  const g = state.gun2;
+  const active = !!(g?.active && g?.phase === 'show' && g?.by && g?.targetId);
+  if (!active){
+    clearGun2Layer();
+    return;
+  }
+
+  const byEl = getPlayerTagEl(g.by);
+  const tgEl = getPlayerTagEl(g.targetId);
+  if (!byEl || !tgEl){
+    clearGun2Layer();
+    return;
+  }
+
+  const pcRect = playerCircle.getBoundingClientRect();
+  const br = byEl.getBoundingClientRect();
+  const tr = tgEl.getBoundingClientRect();
+
+  const x1 = (br.left + br.width/2) - pcRect.left;
+  const y1 = (br.top  + br.height/2) - pcRect.top;
+
+  const x2 = (tr.left + tr.width/2) - pcRect.left;
+  const y2 = (tr.top  + tr.height) - pcRect.top + 6;
+
+  const width = Math.max(1, pcRect.width);
+  const height = Math.max(1, pcRect.height);
+
+  gun2Layer.setAttribute('width', String(width));
+  gun2Layer.setAttribute('height', String(height));
+  gun2Layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+
+  gun2Layer.innerHTML = `
+    <defs>
+      <marker id="gunArrowEnd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)"></path>
+      </marker>
+    </defs>
+    <line
+      x1="${x1}" y1="${y1}"
+      x2="${x2}" y2="${y2}"
+      stroke="rgba(17,17,17,.78)"
+      stroke-width="2"
+      stroke-dasharray="6 5"
+      marker-end="url(#gunArrowEnd)"
+    />
+    <text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle"
+      style="font-size:18px; font-weight:900;">
+      🔫
+    </text>
+  `;
+}
+
+/* =========================
    6：点線矢印＋👀（watchLayer）
    - 「他プレイヤー/選ばれたプレイヤーの画面」だけ表示（= by本人は表示しない）
    ========================= */
@@ -1497,6 +1580,7 @@ function updateWitnessLink(){
 
 window.addEventListener('resize', () => {
   requestUpdateExchangeLink();
+  requestUpdateGun2Link();
   requestUpdateWatchLink();
   requestUpdateWitnessLink();
 });
@@ -1577,6 +1661,7 @@ function updateTurnUI(){
   updateTurnHandEmphasisOnTags();
 
   requestUpdateExchangeLink();
+  requestUpdateGun2Link();
   requestUpdateWatchLink();
   requestUpdateWitnessLink();
 
@@ -3655,11 +3740,13 @@ function renderPlayerCircle(players){
   playerCircle.appendChild(centerArea);
   playerCircle.appendChild(discardStackEl);
   playerCircle.appendChild(linkLayer);
+  playerCircle.appendChild(gun2Layer);
   playerCircle.appendChild(watchLayer);
   playerCircle.appendChild(witnessLayer);
 
   if (!players.length) {
     requestUpdateExchangeLink();
+    requestUpdateGun2Link();
     requestUpdateWatchLink();
     requestUpdateWitnessLink();
     return;
@@ -3925,6 +4012,7 @@ function renderPlayerCircle(players){
   updateDeckUI();
   renderDiscardCenter();
   requestUpdateExchangeLink();
+  requestUpdateGun2Link();
   requestUpdateWatchLink();
   requestUpdateWitnessLink();
 }
