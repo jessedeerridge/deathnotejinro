@@ -677,10 +677,15 @@
     50%{ transform:translate(-50%,-50%) scale(1.08); }
     100%{ transform:translate(-50%,-50%) scale(1); }
   }
+  .player-name{
+    display:inline-block;
+  }
   .player-tag.judgement-targetable{
     cursor:pointer;
-    animation: judgementTagPulse 820ms ease-in-out infinite;
     box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
+  .player-tag.judgement-targetable .player-name{
+    animation: judgementTagPulse 820ms ease-in-out infinite;
   }
 
   .judgement-notebook{
@@ -1390,6 +1395,8 @@ let judgementLastPoint = null;
 let judgementHasStroke = false;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
+let judgementBlackoutSuppressed = false;
+let judgementSessionAt = null;
 let lastJudgementNoZeroAt = null;
 
 function generateRoomCode(length = 6){
@@ -3218,6 +3225,11 @@ function syncJudgementUI(){
     return;
   }
 
+  if (j.at && judgementSessionAt !== j.at){
+    judgementSessionAt = j.at;
+    judgementBlackoutSuppressed = false;
+  }
+
   if (j.phase === 'intro'){
     showJudgementPop();
   }
@@ -3225,7 +3237,7 @@ function syncJudgementUI(){
   if (j.phase === 'noZero'){
     if (j.at && lastJudgementNoZeroAt === j.at) return;
     lastJudgementNoZeroAt = j.at || Date.now();
-    setJudgementFade(true);
+    setJudgementFade(!judgementBlackoutSuppressed);
     showJudgementMessage(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
@@ -3242,7 +3254,7 @@ function syncJudgementUI(){
 
   if (j.phase === 'select' || j.phase === 'writing'){
     const isActiveKira = isKira() && j.kiraId === state.userId;
-    setJudgementFade(!isActiveKira);
+    setJudgementFade(!isActiveKira && !judgementBlackoutSuppressed);
     playerCircle.classList.remove('judgement-spotlight');
     if (j.phase === 'writing' && isActiveKira){
       const targetName = state.players?.find((p) => p.id === j.targetId)?.name || '対象プレイヤー';
@@ -3277,6 +3289,7 @@ function syncJudgementUI(){
   if (j.phase === 'reveal' || j.showNote){
     openJudgementNotebook(false);
     setJudgementFade(false);
+    judgementBlackoutSuppressed = true;
     showJudgementMessage(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
@@ -4537,7 +4550,10 @@ function renderPlayerCircle(players){
 
     const tag = document.createElement('div');
     tag.className = 'player-tag' + (p.id === state.userId ? ' me' : '');
-    tag.textContent = p.name;
+    const nameEl = document.createElement('span');
+    nameEl.className = 'player-name';
+    nameEl.textContent = p.name;
+    tag.appendChild(nameEl);
     tag.style.left = `${x}%`;
     tag.style.top  = `${y}%`;
     tag.dataset.pid = p.id;
