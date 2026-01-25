@@ -677,13 +677,19 @@
   .judgement-fade{
     position:fixed;
     inset:0;
-    background:#000;
+    background:radial-gradient(circle at 50% 50%,
+      rgba(0,0,0,0) 0%,
+      rgba(0,0,0,0) 28%,
+      rgba(0,0,0,0.2) 42%,
+      rgba(0,0,0,0.55) 60%,
+      rgba(0,0,0,0.92) 78%,
+      rgba(0,0,0,0.96) 100%);
     opacity:0;
     transition:opacity 1s ease;
     z-index:12005;
     pointer-events:none;
   }
-  .judgement-fade.active{ opacity:0.96; }
+  .judgement-fade.active{ opacity:1; }
   .judgement-message{
     position:fixed;
     left:50%;
