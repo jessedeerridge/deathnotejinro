@@ -583,6 +583,116 @@
     cursor:not-allowed;
   }
 
+  .judgement-pop{
+    position:fixed;
+    top:80px;
+    left:-320px;
+    transform:translateY(0);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    padding:10px 16px;
+    z-index:12010;
+    font-weight:900;
+    white-space:nowrap;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+  }
+  .judgement-pop.hidden{ display:none; }
+  @keyframes judgementSlide{
+    0%{ transform:translateX(-40px); left:-320px; }
+    25%{ transform:translateX(0); left:50%; }
+    60%{ transform:translateX(-50%); left:50%; }
+    100%{ transform:translateX(40px); left:110%; }
+  }
+  .judgement-pop.animate{
+    animation: judgementSlide 2.8s ease-in-out forwards;
+  }
+
+  .judgement-fade{
+    position:fixed;
+    inset:0;
+    background:#000;
+    opacity:0;
+    transition:opacity 1s ease;
+    z-index:12005;
+    pointer-events:none;
+  }
+  .judgement-fade.active{ opacity:0.85; }
+  .judgement-message{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    font-size:20px;
+    color:#fff;
+    z-index:12012;
+    pointer-events:none;
+  }
+  .judgement-message.hidden{ display:none; }
+
+  @keyframes judgementTagPulse{
+    0%{ transform:translate(-50%,-50%) scale(1); }
+    50%{ transform:translate(-50%,-50%) scale(1.08); }
+    100%{ transform:translate(-50%,-50%) scale(1); }
+  }
+  .player-tag.judgement-targetable{
+    cursor:pointer;
+    animation: judgementTagPulse 820ms ease-in-out infinite;
+    box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
+
+  .judgement-notebook{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:120px;
+    height:170px;
+    display:flex;
+    gap:0;
+    z-index:12015;
+    pointer-events:auto;
+    transition:width 520ms ease;
+  }
+  .judgement-notebook.hidden{ display:none; }
+  .judgement-notebook.open{ width:260px; }
+  .judgement-page{
+    width:120px;
+    height:170px;
+    background:#f8f8f8;
+    border:1px solid #111;
+    box-sizing:border-box;
+  }
+  .judgement-canvas{
+    position:absolute;
+    inset:0;
+    cursor:crosshair;
+  }
+
+  .judgement-close-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:10px 12px;
+    z-index:12022;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:280px;
+    justify-content:space-between;
+  }
+  .judgement-close-pop.hidden{ display:none; }
+  .judgement-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+
   .my-hand-wrapper{margin-top:16px;text-align:center;}
   .my-hand-title{display:none;}
   .my-hand-row{
@@ -937,6 +1047,19 @@
   </div>
 </div>
 
+<div id="judgementPop" class="judgement-pop hidden">裁きの時間</div>
+<div id="judgementFade" class="judgement-fade"></div>
+<div id="judgementMessage" class="judgement-message hidden">裁きの時間は行われませんでした。</div>
+<div id="judgementNotebook" class="judgement-notebook hidden">
+  <div class="judgement-page"></div>
+  <div class="judgement-page"></div>
+  <canvas id="judgementCanvas" class="judgement-canvas"></canvas>
+</div>
+<div id="judgementClosePop" class="judgement-close-pop hidden" aria-hidden="true">
+  <div class="msg">閉じてもいいですか？</div>
+  <button id="btnJudgementCloseYes" class="btn primary">はい</button>
+</div>
+
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
@@ -1062,6 +1185,7 @@ const state = {
   vote7: null,         // ★ 7（投票）
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
+  judgement: null,     // ★ 裁き
 };
 
 const mainEl = document.getElementById('main');
@@ -1142,6 +1266,15 @@ const gun2ConfirmPop = document.getElementById('gun2ConfirmPop');
 const btnGun2Yes = document.getElementById('btnGun2Yes');
 const btnGun2No = document.getElementById('btnGun2No');
 
+/* ★ 裁き */
+const judgementPop = document.getElementById('judgementPop');
+const judgementFade = document.getElementById('judgementFade');
+const judgementMessage = document.getElementById('judgementMessage');
+const judgementNotebook = document.getElementById('judgementNotebook');
+const judgementCanvas = document.getElementById('judgementCanvas');
+const judgementClosePop = document.getElementById('judgementClosePop');
+const btnJudgementCloseYes = document.getElementById('btnJudgementCloseYes');
+
 /* ===== カード説明 ===== */
 const ROLE_HELP = [
   { name: "⓪ デスノート", text: "（効果は後で実装）" },
@@ -1195,6 +1328,9 @@ let lastExchangeEventId = null;
 let localPicked = null;
 let localExchangePicked = null;
 let gun2ConfirmPending = false;
+let judgementPopAnimating = false;
+let judgementDrawActive = false;
+let judgementLastPoint = null;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1269,6 +1405,8 @@ function getMyIdentity(){ return state.hands?.[state.userId]?.identity || null; 
 function isKira(){ return getMyIdentity() === 'キラ'; }
 function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' || id === '信者'; }
 function isPolice(){ const id = getMyIdentity(); return id === '警察1' || id === '警察2'; }
+function isJudgementActive(){ return !!state.judgement?.active; }
+function getJudgement(){ return (state.judgement && typeof state.judgement === 'object') ? state.judgement : null; }
 
 function calcIsPlayable(){
   const myId = state.userId;
@@ -1282,8 +1420,9 @@ function calcIsPlayable(){
   const vActive   = isVote7Active();
   const sActive   = isShinigamiActive();
   const gActive   = isGun2Active();
+  const jActive   = isJudgementActive();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && (count === 3);
+  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && (count === 3);
 }
 
 /* =========================
@@ -1999,6 +2138,17 @@ function subscribeShinigami13(){
     const s = snap.val() || null;
     state.shinigami13 = (s && typeof s === 'object') ? s : null;
     updateTurnUI();
+    renderPlayerCircle(latestPlayers);
+  });
+}
+
+/* ★ 裁き 購読 */
+function subscribeJudgement(){
+  const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
+  onValue(jRef, snap => {
+    const j = snap.val() || null;
+    state.judgement = (j && typeof j === 'object') ? j : null;
+    syncJudgementUI();
     renderPlayerCircle(latestPlayers);
   });
 }
@@ -2924,6 +3074,221 @@ btnGun2No?.addEventListener('click', async (e) => {
 });
 
 /* =========================
+   ★ 裁き UI & ロジック
+   ========================= */
+function showJudgementPop(){
+  if (!judgementPop || judgementPopAnimating) return;
+  judgementPopAnimating = true;
+  judgementPop.classList.remove('hidden');
+  judgementPop.classList.remove('animate');
+  void judgementPop.offsetWidth;
+  judgementPop.classList.add('animate');
+  setTimeout(() => {
+    judgementPop.classList.add('hidden');
+    judgementPop.classList.remove('animate');
+    judgementPopAnimating = false;
+  }, 2800);
+}
+
+function setJudgementFade(active){
+  if (!judgementFade) return;
+  judgementFade.classList.toggle('active', active);
+}
+
+function showJudgementMessage(show){
+  if (!judgementMessage) return;
+  judgementMessage.classList.toggle('hidden', !show);
+}
+
+function openJudgementNotebook(enableDraw){
+  if (!judgementNotebook) return;
+  judgementNotebook.classList.remove('hidden');
+  judgementNotebook.classList.add('open');
+  if (judgementCanvas){
+    judgementCanvas.width = judgementNotebook.clientWidth;
+    judgementCanvas.height = judgementNotebook.clientHeight;
+    judgementCanvas.style.pointerEvents = enableDraw ? 'auto' : 'none';
+  }
+  judgementDrawActive = !!enableDraw;
+}
+
+function syncJudgementUI(){
+  const j = getJudgement();
+  const hasActive = !!j?.active;
+
+  if (!hasActive){
+    setJudgementFade(false);
+    showJudgementMessage(false);
+    if (!j?.showNote){
+      judgementNotebook?.classList.add('hidden');
+      judgementNotebook?.classList.remove('open');
+    }
+    judgementClosePop?.classList.add('hidden');
+    judgementClosePop?.setAttribute('aria-hidden','true');
+    return;
+  }
+
+  if (j.phase === 'intro'){
+    showJudgementPop();
+  }
+
+  if (j.phase === 'noZero'){
+    setJudgementFade(true);
+    showJudgementMessage(false);
+    setTimeout(() => {
+      showJudgementMessage(true);
+      setJudgementFade(false);
+    }, 5000);
+  }
+
+  if (j.phase === 'select' || j.phase === 'writing'){
+    if (!isKira()){
+      setJudgementFade(true);
+    }
+  }
+
+  if (j.phase === 'writing' && j.kiraId === state.userId){
+    openJudgementNotebook(true);
+    judgementClosePop?.classList.remove('hidden');
+    judgementClosePop?.setAttribute('aria-hidden','false');
+  } else {
+    judgementClosePop?.classList.add('hidden');
+    judgementClosePop?.setAttribute('aria-hidden','true');
+  }
+
+  if (j.phase === 'reveal' || j.showNote){
+    openJudgementNotebook(false);
+    setJudgementFade(false);
+    showJudgementMessage(false);
+  }
+}
+
+function getCurrentRound(playerCount){
+  if (!playerCount) return 1;
+  const seq = Number(state.turn?.turnSeq || 1);
+  return Math.max(1, Math.ceil(seq / playerCount));
+}
+
+async function startJudgementSequence(players){
+  if (!state.roomCode) return;
+  const lockRef = ref(db, `rooms/${state.roomCode}/judgementLock`);
+  const myId = state.userId;
+
+  const locked = await runTransaction(lockRef, (v) => {
+    if (v && v.by && v.at && (Date.now() - v.at) < 15000) return;
+    return { by: myId, at: Date.now() };
+  }, { applyLocally:false });
+  if (!locked.committed) return;
+
+  try{
+    await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+
+    const handsSnap = await get(ref(db, `rooms/${state.roomCode}/hands`));
+    const hands = handsSnap.val() || {};
+    let kiraId = null;
+    let kiraHasZero = false;
+    for (const [pid, hand] of Object.entries(hands)){
+      if (hand?.identity === 'キラ'){
+        kiraId = pid;
+        const cards = Array.isArray(hand.cards) ? hand.cards : [];
+        kiraHasZero = cards.includes('0');
+        break;
+      }
+    }
+
+    const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
+    await set(jRef, {
+      active: true,
+      phase: kiraHasZero ? 'select' : 'noZero',
+      kiraId,
+      targetId: null,
+      at: Date.now(),
+      showNote: false
+    });
+
+    if (!kiraHasZero){
+      setTimeout(() => {
+        finishJudgementNoZero().catch(console.warn);
+      }, 6500);
+    }
+  } finally {
+    await set(ref(db, `rooms/${state.roomCode}/judgementLock`), null);
+  }
+}
+
+async function finishJudgementNoZero(){
+  if (!state.roomCode) return;
+  const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
+  const jSnap = await get(jRef);
+  const j = jSnap.val();
+  if (!j?.active || j.phase !== 'noZero') return;
+
+  await set(jRef, null);
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+  await advanceTurnToNextPlayer();
+}
+
+async function pickJudgementTarget(targetId){
+  if (!state.roomCode) return;
+  const j = getJudgement();
+  if (!j?.active || j.phase !== 'select') return;
+  if (j.kiraId !== state.userId) return;
+  if (!targetId || targetId === state.userId) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/judgement`), {
+    phase:'writing',
+    targetId,
+    updatedAt: Date.now()
+  });
+}
+
+btnJudgementCloseYes?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  const j = getJudgement();
+  if (!j?.active || j.phase !== 'writing') return;
+  if (j.kiraId !== state.userId) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/judgement`), {
+    active:false,
+    phase:'reveal',
+    showNote:true,
+    revealedAt: Date.now()
+  });
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+  await advanceTurnToNextPlayer();
+});
+
+function bindJudgementCanvas(){
+  if (!judgementCanvas) return;
+  const ctx = judgementCanvas.getContext('2d');
+  if (!ctx) return;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#111';
+
+  const startDraw = (e) => {
+    if (!judgementDrawActive) return;
+    judgementLastPoint = { x: e.offsetX, y: e.offsetY };
+  };
+  const draw = (e) => {
+    if (!judgementDrawActive || !judgementLastPoint) return;
+    ctx.beginPath();
+    ctx.moveTo(judgementLastPoint.x, judgementLastPoint.y);
+    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.stroke();
+    judgementLastPoint = { x: e.offsetX, y: e.offsetY };
+  };
+  const endDraw = () => { judgementLastPoint = null; };
+
+  judgementCanvas.addEventListener('pointerdown', startDraw);
+  judgementCanvas.addEventListener('pointermove', draw);
+  judgementCanvas.addEventListener('pointerup', endDraw);
+  judgementCanvas.addEventListener('pointerleave', endDraw);
+}
+
+bindJudgementCanvas();
+
+/* =========================
    ★ 7（投票）状態機械
    ========================= */
 function getVote7(){
@@ -3182,6 +3547,7 @@ async function maybeAutoDrawAtTurnStart(){
   if (isExchangeActive()) return;
   if (isWatchActive()) return;
   if (isWitnessActive()) return;
+  if (isJudgementActive()) return;
   if (isGun2Active()) return;
 
   autoDrawInFlight = true;
@@ -3650,6 +4016,7 @@ async function advanceTurnToNextPlayer(){
   if (isWitnessActive()) return;
   if (isVote7Active()) return;
   if (isShinigamiActive()) return;
+  if (isJudgementActive()) return;
   if (isGun2Active()) return;
 
   const players = await getSeatedPlayers();
@@ -3658,6 +4025,13 @@ async function advanceTurnToNextPlayer(){
   const currentId = state.turn.currentPlayerId || players[0].id;
   const idx = players.findIndex(p => p.id === currentId);
   const next = players[(idx >= 0 ? idx + 1 : 0) % players.length];
+
+  const isLastPlayer = (idx === players.length - 1);
+  const round = getCurrentRound(players.length);
+  if (isLastPlayer && round >= 2){
+    await startJudgementSequence(players);
+    return;
+  }
 
   const turnRef = ref(db, `rooms/${state.roomCode}/turn`);
   const tSnap = await get(turnRef);
@@ -3731,6 +4105,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeShinigami13();
   // ★ 2（拳銃）
   subscribeGun2();
+  // ★ 裁き
+  subscribeJudgement();
 
   syncSeatUI();
 });
@@ -3959,6 +4335,15 @@ function renderPlayerCircle(players){
       tag.classList.add('gun2-targetable');
       tag.addEventListener('click', async () => {
         await pickGun2Target(p.id);
+      });
+    }
+
+    const j = getJudgement();
+    const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
+    if (isJudgementSelecting && p.id !== state.userId){
+      tag.classList.add('judgement-targetable');
+      tag.addEventListener('click', async () => {
+        await pickJudgementTarget(p.id);
       });
     }
 
@@ -4280,6 +4665,8 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/vote7`), null),
     set(ref(db, `rooms/${state.roomCode}/shinigami13`), null),
     set(ref(db, `rooms/${state.roomCode}/gun2`), null),
+    set(ref(db, `rooms/${state.roomCode}/judgement`), null),
+    set(ref(db, `rooms/${state.roomCode}/judgementLock`), null),
   ]);
 
   if (initialDrawDisp){
@@ -4321,6 +4708,8 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/vote7`)),
     remove(ref(db, `${base}/shinigami13`)),
     remove(ref(db, `${base}/gun2`)),
+    remove(ref(db, `${base}/judgement`)),
+    remove(ref(db, `${base}/judgementLock`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
