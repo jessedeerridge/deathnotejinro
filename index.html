@@ -1956,7 +1956,7 @@ function shouldDisablePlayCard(cardId){
   if (!state.isPlayable) return false;
   const id = String(cardId ?? '');
   if (id === '0') return true;
-  if (id === '1' && getMyIdentity() !== 'L') return true;
+  if (id === '1' && !['L', 'L2'].includes(getMyIdentity())) return true;
   return false;
 }
 function updatePlayDisabledForHand(){
@@ -6008,9 +6008,10 @@ function buildDeckForPlayers(playerCount){
 }
 
 function buildIdentityDeck(playerCount){
-  const roles = ["キラ","L","警察1","警察2"];
+  const roles = ["キラ","L","警察1","警察2","警察2"];
   if (playerCount === 5) roles.push("信者");
   if (playerCount === 6) roles.push("L2");
+  if (playerCount === 6) roles.push("ワタリ");
   let policeIndex = 3;
   while (roles.length < playerCount) roles.push(`警察${policeIndex++}`);
   return roles.slice(0, playerCount);
