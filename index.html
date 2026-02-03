@@ -734,11 +734,11 @@
   }
   .arrest-kira-half.left{
     clip-path:polygon(0 0, 52% 0, 48% 100%, 0 100%);
-    animation: arrestBreakLeft 1200ms ease forwards;
+    animation: arrestBreakLeft 1800ms ease forwards;
   }
   .arrest-kira-half.right{
     clip-path:polygon(52% 0, 100% 0, 100% 100%, 48% 100%);
-    animation: arrestBreakRight 1200ms ease forwards;
+    animation: arrestBreakRight 1800ms ease forwards;
   }
   @keyframes arrestBreakLeft{
     0%{ transform:translateX(0) rotate(0); opacity:1; }
@@ -1273,8 +1273,7 @@
   .arrest-id-card{
     position:absolute;
     left:50%;
-    top:100%;
-    margin-top:6px;
+    top:0;
     width:24px;height:33px;
     border-radius:4px;
     border:1px solid rgba(0,0,0,.22);
@@ -1286,6 +1285,9 @@
     animation: arrestIdPulse 760ms ease-in-out infinite;
     z-index:30;
     pointer-events:none;
+  }
+  .player-tag .arrest-id-card{
+    margin-left:-40px;
   }
   .arrest-id-card.targetable{
     cursor:pointer;
@@ -3703,7 +3705,7 @@ function showArrestOverlay(type){
   setTimeout(() => {
     overlay.classList.add('hidden');
     overlay.setAttribute('aria-hidden', 'true');
-  }, 1200);
+  }, 1800);
 }
 
 async function startArrest1(byPlayerId){
@@ -5573,18 +5575,6 @@ function renderPlayerCircle(players){
       }
     }
 
-    if (arrestActive && !eliminated){
-      const arrestCard = document.createElement('div');
-      arrestCard.className = 'arrest-id-card';
-      if (isArrestByMe && p.id !== state.userId){
-        arrestCard.classList.add('targetable');
-        arrestCard.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await pickArrest1Target(p.id);
-        });
-      }
-      tag.appendChild(arrestCard);
-    }
     if (eliminated && eliminatedDiscardedAt){
       const idSlide = document.createElement('div');
       idSlide.className = 'eliminated-identity-card';
@@ -5604,6 +5594,16 @@ function renderPlayerCircle(players){
       const miniCircle = document.createElement('div');
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
+
+      if (isArrestByMe && !eliminated){
+        const arrestCard = document.createElement('div');
+        arrestCard.className = 'arrest-id-card targetable';
+        arrestCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickArrest1Target(p.id);
+        });
+        miniHand.appendChild(arrestCard);
+      }
 
       if (eliminated && !eliminatedDiscardedAt){
         const idFace = document.createElement('div');
@@ -5698,6 +5698,20 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
+        tag.appendChild(miniHand);
+      } else if (isArrestByMe && p.id !== state.userId && !eliminated){
+        const miniHand = document.createElement('div');
+        miniHand.className = 'mini-hand';
+        const miniCircle = document.createElement('div');
+        miniCircle.className = 'mini-hand-circle';
+        miniHand.appendChild(miniCircle);
+        const arrestCard = document.createElement('div');
+        arrestCard.className = 'arrest-id-card targetable';
+        arrestCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickArrest1Target(p.id);
+        });
+        miniHand.appendChild(arrestCard);
         tag.appendChild(miniHand);
       } else if (eliminated && !eliminatedDiscardedAt && p.id !== state.userId){
         const miniHand = document.createElement('div');
