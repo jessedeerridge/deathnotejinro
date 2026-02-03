@@ -2984,6 +2984,23 @@ function getMinTargets(cards){
   nums.forEach((v,i) => { if (v === min) idxs.push(i); });
   return { minValue:min, indices:idxs };
 }
+function canPickAnyForMinSelection(identity, cards){
+  const role = String(identity || '').trim();
+  if (!role) return false;
+  const hand = Array.isArray(cards) ? cards.map(String) : [];
+  const hasCard = (value) => hand.includes(String(value));
+
+  if (role === 'キラ'){
+    return hasCard(0);
+  }
+  if (role === 'L' || role === 'L2' || role === 'ワタリ' || role === 'Watari'){
+    return hasCard(1);
+  }
+  if (role === '警察1' || role === '警察2'){
+    return hasCard(2);
+  }
+  return false;
+}
 
 /* =========================
    9（尋問）
@@ -4631,7 +4648,10 @@ function renderMyHand(){
     } catch {}
   }
 
-  const { indices:minIdxs9 } = isInvPickingMin() ? getMinTargets(cards) : { indices:[] };
+  const canPickAnyMin = canPickAnyForMinSelection(handData?.identity, cards);
+  const { indices:minIdxs9 } = isInvPickingMin()
+    ? (canPickAnyMin ? { indices: cards.map((_, idx) => idx) } : getMinTargets(cards))
+    : { indices:[] };
   const picked9 = mySelection();
 
   const exActive  = isExchangeActive();
@@ -4639,7 +4659,9 @@ function renderMyHand(){
   const isTargetPicking = !!(exActive && ex?.phase === 'targetPickMin' && ex?.targetId === myId);
   const isByPicking     = !!(exActive && ex?.phase === 'byPickReturn' && ex?.by === myId);
 
-  const minIdxs8 = isTargetPicking ? getMinTargets(cards).indices : [];
+  const minIdxs8 = isTargetPicking
+    ? (canPickAnyMin ? cards.map((_, idx) => idx) : getMinTargets(cards).indices)
+    : [];
   const picked8 = localExchangePicked;
 
   const g = getGun2();
@@ -5954,14 +5976,14 @@ function buildDeckForPlayers(playerCount){
     pushN(deck, 0, 20);
     pushN(deck, 1, 1);
     pushN(deck, 2, 1);
-    pushN(deck, 3, 20);
+    pushN(deck, 3, 1);
     pushN(deck, 5, 1);
     pushN(deck, 4, 1);
     pushN(deck, 6, 1);
     pushN(deck, 7, 2);
-    pushN(deck, 8, 4);
-    pushN(deck, 9, 4);
-    pushN(deck, 13, 8);
+    pushN(deck, 8, 9);
+    pushN(deck, 9, 9);
+    pushN(deck, 13, 0);
     return deck;
   }
 
