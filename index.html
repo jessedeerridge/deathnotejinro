@@ -1434,7 +1434,7 @@ let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 let judgementFadeInMain = false;
-const JUDGEMENT_NOTE_DISPLAY_MS = 1000;
+const JUDGEMENT_NOTE_DISPLAY_MS = 1500;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -3626,7 +3626,7 @@ async function discardHandSequentially(targetId, byId){
       return arr;
     }, { applyLocally:false });
 
-    await sleep(1800);
+    await sleep(1200);
   }
 }
 
