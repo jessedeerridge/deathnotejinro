@@ -467,7 +467,7 @@
     width:24px;height:33px;
     border-radius:4px;
     border:1px solid rgba(0,0,0,.22);
-    background-image:url('dnura.jpg');
+    background-image:url('dnroleura.jpg');
     background-size:cover;
     background-position:center;
     box-shadow:0 2px 8px rgba(0,0,0,.18);
@@ -993,10 +993,13 @@
     100% { transform:scale(1); }
   }
   .my-hand.is-playable .my-card{
+    animation:none;
+  }
+  .my-hand.is-playable .my-card.can-play{
     animation: myPulse 900ms ease-in-out infinite;
     cursor:grab;
   }
-  .my-hand.is-playable .my-card:active{ cursor:grabbing; }
+  .my-hand.is-playable .my-card.can-play:active{ cursor:grabbing; }
 
   /* ★ 8：交換で「返すカードを選ぶ」 */
   .my-hand.exchange-pick .my-card{
@@ -1010,7 +1013,7 @@
     100% { transform:translateX(0); opacity:1; }
   }
   .my-card.new-in{ animation: slideInRight 220ms ease both; }
-  .my-hand.is-playable .my-card.new-in{ animation: slideInRight 220ms ease both, myPulse 900ms ease-in-out infinite; }
+  .my-hand.is-playable .my-card.can-play.new-in{ animation: slideInRight 220ms ease both, myPulse 900ms ease-in-out infinite; }
   .my-hand.exchange-pick .my-card.new-in{ animation: slideInRight 220ms ease both, myPulse 900ms ease-in-out infinite; }
 
   .drag-ghost{
@@ -1147,9 +1150,46 @@
   display:flex;align-items:center;justify-content:center;
   font-weight:900;font-size:11px;
   flex:0 0 auto;
+  border:1px solid rgba(17,17,17,.8);
 
   /* ★ここで上下位置調整（上に上げるほどマイナスを大きく） */
   margin-top:-1px;
+
+  /* ★ ギザギザの丸 */
+  clip-path: polygon(
+    50% 0%,
+    58% 6%,
+    67% 2%,
+    74% 10%,
+    84% 8%,
+    88% 18%,
+    98% 24%,
+    92% 34%,
+    100% 50%,
+    92% 66%,
+    98% 76%,
+    88% 82%,
+    84% 92%,
+    74% 90%,
+    67% 98%,
+    58% 94%,
+    50% 100%,
+    42% 94%,
+    33% 98%,
+    26% 90%,
+    16% 92%,
+    12% 82%,
+    2% 76%,
+    8% 66%,
+    0% 50%,
+    8% 34%,
+    2% 24%,
+    12% 18%,
+    16% 8%,
+    26% 10%,
+    33% 2%,
+    42% 6%
+  );
 }
 
 /* ★ カード名も少し上に寄せる */
@@ -1187,6 +1227,8 @@
   display:flex;
   align-items:center;
   justify-content:center;
+  overflow:hidden;
+  word-break:break-word;
 
   /* ★効果枠の中身の上下を詰める */
   padding:1px;
@@ -1226,6 +1268,44 @@
   .card-face.mini .card-effect{
     font-size:6px;
     padding:1px;
+  }
+
+  .card-face.card-orange{
+    color:#f97316;
+  }
+  .card-face.card-orange .card-title,
+  .card-face.card-orange .card-effect{
+    color:#f97316;
+  }
+  .card-face.card-orange .card-circle{
+    color:#f97316;
+    border-color:#f97316;
+  }
+  .card-face.card-orange .card-image,
+  .card-face.card-orange .card-effect{
+    border-color:#f97316;
+  }
+  .my-card.card-orange,
+  .mini-card.card-orange,
+  .watch-card.card-orange,
+  .discard-card.card-orange,
+  .discard-flyer.card-orange,
+  .drag-ghost.card-orange,
+  .role-card.card-orange{
+    border-color:#f97316;
+    box-shadow:0 6px 16px rgba(249,115,22,.25);
+  }
+
+  .identity-card{
+    background:#fff;
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    color:transparent;
+    text-shadow:none;
+  }
+  .identity-card.identity-back{
+    background-image:url('dnroleura.jpg');
   }
 
 
@@ -1289,7 +1369,7 @@
     width:24px;height:33px;
     border-radius:4px;
     border:1px solid rgba(0,0,0,.22);
-    background-image:url('dnura.jpg');
+    background-image:url('dnroleura.jpg');
     background-size:cover;
     background-position:center;
     box-shadow:0 2px 8px rgba(0,0,0,.18);
@@ -1758,10 +1838,47 @@ function getCardInfo(cardId){
   return CARD_LOOKUP.get(key) || { id: key, name: "カード", effect: "", image: "" };
 }
 
+function isOrangeCardId(cardId){
+  const id = String(cardId ?? '');
+  return id === '0' || id === '1';
+}
+
+function fitEffectText(effectEl){
+  if (!effectEl) return;
+  const face = effectEl.closest('.card-face');
+  const isMini = !!face?.classList.contains('mini');
+  const minFont = isMini ? 5 : 7;
+  const computed = window.getComputedStyle(effectEl);
+  if (!effectEl.dataset.maxFontSize){
+    effectEl.dataset.maxFontSize = computed.fontSize;
+  }
+  const maxFont = parseFloat(effectEl.dataset.maxFontSize) || (isMini ? 6 : 8);
+  let size = maxFont;
+  effectEl.style.fontSize = `${size}px`;
+  while (size > minFont && (effectEl.scrollHeight > effectEl.clientHeight || effectEl.scrollWidth > effectEl.clientWidth)){
+    size -= 0.5;
+    effectEl.style.fontSize = `${size}px`;
+  }
+}
+
+function scheduleFitEffectText(effectEl){
+  if (!effectEl) return;
+  requestAnimationFrame(() => fitEffectText(effectEl));
+}
+
+function refitAllCardEffects(){
+  document.querySelectorAll('.card-effect').forEach((effectEl) => {
+    fitEffectText(effectEl);
+  });
+}
+
 function buildCardFace(cardId, { size = '' } = {}){
   const info = getCardInfo(cardId);
   const face = document.createElement('div');
   face.className = `card-face${size ? ` ${size}` : ''}`;
+  if (isOrangeCardId(info.id)){
+    face.classList.add('card-orange');
+  }
 
   const circle = document.createElement('div');
   circle.className = 'card-circle';
@@ -1786,11 +1903,14 @@ function buildCardFace(cardId, { size = '' } = {}){
   face.appendChild(image);
   face.appendChild(effect);
 
+  scheduleFitEffectText(effect);
+
   return face;
 }
 
 function applyCardFace(cardEl, cardId, { size = '' } = {}){
   cardEl.innerHTML = '';
+  cardEl.classList.toggle('card-orange', isOrangeCardId(cardId));
   cardEl.appendChild(buildCardFace(cardId, { size }));
 }
 
@@ -1809,6 +1929,7 @@ function renderHelpList(){
     row.appendChild(desc);
     helpBody.appendChild(row);
   });
+  refitAllCardEffects();
 }
 function openHelp(){ renderHelpList(); helpBackdrop.classList.remove('hidden'); }
 function closeHelp(){ helpBackdrop.classList.add('hidden'); }
@@ -1956,6 +2077,15 @@ function calcIsPlayable(){
   const aActive   = isArrestActive();
 
   return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && (count === 3);
+}
+
+function canPlayCardOnTurn(cardId, { isPlayable } = {}){
+  const playable = (typeof isPlayable === 'boolean') ? isPlayable : state.isPlayable;
+  if (!playable) return false;
+  const id = String(cardId ?? '');
+  if (id === '1') return getMyIdentity() === 'L';
+  if (id === '2') return isPolice();
+  return true;
 }
 
 /* =========================
@@ -2347,6 +2477,7 @@ window.addEventListener('resize', () => {
   requestUpdateGun2Link();
   requestUpdateWatchLink();
   requestUpdateWitnessLink();
+  refitAllCardEffects();
 });
 
 function updateTurnUI(){
@@ -2803,6 +2934,23 @@ function subscribeArrest1Event(){
   });
 }
 
+function applyIdentityCardFront(el, identity){
+  if (!el) return;
+  const label = identity || '？';
+  el.classList.add('identity-card');
+  el.classList.remove('identity-back');
+  el.style.backgroundImage = identity ? `url('${identity}.jpg')` : '';
+  el.textContent = label;
+  el.setAttribute('aria-label', label);
+}
+
+function applyIdentityCardBack(el){
+  if (!el) return;
+  el.classList.add('identity-card', 'identity-back');
+  el.textContent = '';
+  el.setAttribute('aria-label', '正体カード（裏）');
+}
+
 /* ====== 正体 ====== */
 function renderMyIdentity(){
   const myId = state.userId;
@@ -2810,10 +2958,12 @@ function renderMyIdentity(){
   if (!identity){
     myIdentityEl.classList.add('hidden');
     myIdentityEl.textContent = '？';
+    myIdentityEl.classList.remove('identity-card', 'identity-back');
+    myIdentityEl.style.backgroundImage = '';
     return;
   }
   myIdentityEl.classList.remove('hidden');
-  myIdentityEl.textContent = identity;
+  applyIdentityCardFront(myIdentityEl, identity);
 }
 
 /* ====== 捨て札 ====== */
@@ -2862,6 +3012,7 @@ function isPointInRect(x, y, rect){ return x >= rect.left && x <= rect.right && 
 function onCardPointerDown(e){
   const cardEl = e.currentTarget;
   if (!state.isPlayable) return;
+  if (!cardEl.classList.contains('can-play')) return;
 
   const idx = Number(cardEl.dataset.index);
   if (!Number.isFinite(idx)) return;
@@ -4502,7 +4653,7 @@ function renderWitnessCenterHand(targetId){
 
   const card = document.createElement('div');
   card.className = 'witness-card';
-  card.textContent = identity;
+  applyIdentityCardFront(card, identity);
   card.style.transform = `translate(-50%,-50%) scale(1.08)`;
   card.style.zIndex = '10';
   witnessHandEl.appendChild(card);
@@ -4556,6 +4707,7 @@ function renderMyHand(){
   const myId = state.userId;
   const handData = state.hands[myId];
   const cards = Array.isArray(handData?.cards) ? handData.cards : [];
+  const isPlayableNow = calcIsPlayable();
 
   const sig = JSON.stringify(cards);
 
@@ -4595,6 +4747,10 @@ function renderMyHand(){
     applyCardFace(card, v);
     card.dataset.index = String(i);
     card.dataset.cardId = String(v);
+    const canPlayNow = canPlayCardOnTurn(v, { isPlayable: isPlayableNow });
+    if (canPlayNow){
+      card.classList.add('can-play');
+    }
 
     if (shouldMarkNewLast && i === cards.length - 1){
       card.classList.add('new-in');
@@ -4632,16 +4788,19 @@ function renderMyHand(){
       });
     }
 
-    card.addEventListener('pointerdown', onCardPointerDown);
-    card.addEventListener('pointermove', onCardPointerMove);
-    card.addEventListener('pointerup', onCardPointerUp);
-    card.addEventListener('pointercancel', onCardPointerUp);
+    if (canPlayNow){
+      card.addEventListener('pointerdown', onCardPointerDown);
+      card.addEventListener('pointermove', onCardPointerMove);
+      card.addEventListener('pointerup', onCardPointerUp);
+      card.addEventListener('pointercancel', onCardPointerUp);
+    }
 
     myHandEl.appendChild(card);
   });
 
   prevMyCardsSig = sig;
   updateTurnUI();
+  refitAllCardEffects();
 }
 
 function renderHands(){
@@ -4967,7 +5126,12 @@ async function animateDiscardFlyer(entry){
 }
 
 function animateDiscardEntries(entries){
-  entries.forEach((entry, idx) => {
+  const filtered = entries.filter((entry) => {
+    if (!entry) return false;
+    const isMyPlay = entry.reason === 'play' && entry.by === state.userId;
+    return !isMyPlay;
+  });
+  filtered.forEach((entry, idx) => {
     setTimeout(() => {
       animateDiscardFlyer(entry).catch(console.warn);
     }, idx * 180);
@@ -5150,6 +5314,8 @@ async function playCardFromHand(cardIndex){
   const handData = state.hands[myId];
   const cards = Array.isArray(handData?.cards) ? [...handData.cards] : [];
   if (cardIndex < 0 || cardIndex >= cards.length) return;
+
+  if (!canPlayCardOnTurn(cards[cardIndex], { isPlayable: true })) return;
 
   const used = cards.splice(cardIndex, 1)[0];
 
@@ -5670,7 +5836,7 @@ function renderPlayerCircle(players){
     if (eliminated && eliminatedDiscardedAt){
       const idSlide = document.createElement('div');
       idSlide.className = 'eliminated-identity-card';
-      idSlide.textContent = eliminatedIdentity;
+      applyIdentityCardFront(idSlide, eliminatedIdentity);
       const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
       if (Number.isFinite(elapsed) && elapsed >= 200){
         idSlide.classList.add('settled');
@@ -5690,6 +5856,7 @@ function renderPlayerCircle(players){
       if (isArrestByMe && !eliminated){
         const arrestCard = document.createElement('div');
         arrestCard.className = 'arrest-id-card targetable';
+        applyIdentityCardBack(arrestCard);
         arrestCard.addEventListener('click', async (e) => {
           e.stopPropagation();
           await pickArrest1Target(p.id);
@@ -5700,7 +5867,7 @@ function renderPlayerCircle(players){
       if (eliminated && !eliminatedDiscardedAt){
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
-        idFace.textContent = eliminatedIdentity;
+        applyIdentityCardFront(idFace, eliminatedIdentity);
         miniHand.appendChild(idFace);
       }
 
@@ -5709,6 +5876,7 @@ function renderPlayerCircle(players){
         const idBack = document.createElement('div');
         idBack.className = 'witness-id-back';
         idBack.title = '正体カード（裏）';
+        applyIdentityCardBack(idBack);
         idBack.addEventListener('click', async (e) => {
           e.stopPropagation();
           await pickWitness5Target(p.id);
@@ -5723,6 +5891,7 @@ function renderPlayerCircle(players){
           const idBack = document.createElement('div');
           idBack.className = 'witness-id-back';
           idBack.title = '正体カード（裏）';
+          applyIdentityCardBack(idBack);
           // クリック不可
           idBack.style.animation = 'none';
           idBack.style.cursor = 'default';
@@ -5790,6 +5959,7 @@ function renderPlayerCircle(players){
         const idBack = document.createElement('div');
         idBack.className = 'witness-id-back';
         idBack.title = '正体カード（裏）';
+        applyIdentityCardBack(idBack);
         idBack.addEventListener('click', async (e) => {
           e.stopPropagation();
           await pickWitness5Target(p.id);
@@ -5804,6 +5974,7 @@ function renderPlayerCircle(players){
         miniHand.appendChild(miniCircle);
         const arrestCard = document.createElement('div');
         arrestCard.className = 'arrest-id-card targetable';
+        applyIdentityCardBack(arrestCard);
         arrestCard.addEventListener('click', async (e) => {
           e.stopPropagation();
           await pickArrest1Target(p.id);
@@ -5818,7 +5989,7 @@ function renderPlayerCircle(players){
         miniHand.appendChild(miniCircle);
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
-        idFace.textContent = eliminatedIdentity;
+        applyIdentityCardFront(idFace, eliminatedIdentity);
         miniHand.appendChild(idFace);
         tag.appendChild(miniHand);
       } else if (iAmGun2By && p.id !== state.userId){
@@ -5841,6 +6012,7 @@ function renderPlayerCircle(players){
           const idBack = document.createElement('div');
           idBack.className = 'witness-id-back';
           idBack.title = '正体カード（裏）';
+          applyIdentityCardBack(idBack);
           idBack.style.animation = 'none';
           idBack.style.cursor = 'default';
           idBack.style.pointerEvents = 'none';
