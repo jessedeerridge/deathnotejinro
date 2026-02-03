@@ -467,7 +467,7 @@
     width:24px;height:33px;
     border-radius:4px;
     border:1px solid rgba(0,0,0,.22);
-    background-image:url('dnura.jpg');
+    background-image:url('dnroleura.jpg');
     background-size:cover;
     background-position:center;
     box-shadow:0 2px 8px rgba(0,0,0,.18);
@@ -1051,6 +1051,11 @@
   }
   .my-card.dragging{
     opacity:0;
+  }
+  .identity-card{
+    background-size:cover;
+    background-position:center;
+    color:transparent;
   }
 
   .dialog-backdrop{
@@ -1799,6 +1804,14 @@ function buildCardFace(cardId, { size = '' } = {}){
 function applyCardFace(cardEl, cardId, { size = '' } = {}){
   cardEl.innerHTML = '';
   cardEl.appendChild(buildCardFace(cardId, { size }));
+}
+
+function applyIdentityCardFace(cardEl, identity, { face = true } = {}){
+  const imageName = face ? `${identity}.jpg` : 'dnroleura.jpg';
+  cardEl.classList.add('identity-card');
+  cardEl.style.backgroundImage = `url('${imageName}')`;
+  cardEl.textContent = '';
+  cardEl.setAttribute('aria-label', identity ? `正体カード: ${identity}` : '正体カード');
 }
 
 function renderHelpList(){
@@ -2816,11 +2829,11 @@ function renderMyIdentity(){
   const identity = state.hands[myId]?.identity;
   if (!identity){
     myIdentityEl.classList.add('hidden');
-    myIdentityEl.textContent = '？';
+    applyIdentityCardFace(myIdentityEl, '', { face:false });
     return;
   }
   myIdentityEl.classList.remove('hidden');
-  myIdentityEl.textContent = identity;
+  applyIdentityCardFace(myIdentityEl, identity, { face:true });
 }
 
 /* ====== 捨て札 ====== */
@@ -4520,7 +4533,7 @@ function renderWitnessCenterHand(targetId){
 
   const card = document.createElement('div');
   card.className = 'witness-card';
-  card.textContent = identity;
+  applyIdentityCardFace(card, identity, { face:true });
   card.style.transform = `translate(-50%,-50%) scale(1.08)`;
   card.style.zIndex = '10';
   witnessHandEl.appendChild(card);
@@ -5696,13 +5709,13 @@ function renderPlayerCircle(players){
       if (aliasIdx >= 0) aliasRevealIdx = aliasIdx;
     }
 
-    if (eliminated && eliminatedDiscardedAt){
-      const idSlide = document.createElement('div');
-      idSlide.className = 'eliminated-identity-card';
-      idSlide.textContent = eliminatedIdentity;
-      const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
-      if (Number.isFinite(elapsed) && elapsed >= 200){
-        idSlide.classList.add('settled');
+  if (eliminated && eliminatedDiscardedAt){
+    const idSlide = document.createElement('div');
+    idSlide.className = 'eliminated-identity-card';
+    applyIdentityCardFace(idSlide, eliminatedIdentity, { face:true });
+    const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
+    if (Number.isFinite(elapsed) && elapsed >= 200){
+      idSlide.classList.add('settled');
       } else if (Number.isFinite(elapsed)){
         idSlide.style.animationDelay = `${Math.max(0, 200 - elapsed)}ms`;
       }
@@ -5726,12 +5739,12 @@ function renderPlayerCircle(players){
         miniHand.appendChild(arrestCard);
       }
 
-      if (eliminated && !eliminatedDiscardedAt){
-        const idFace = document.createElement('div');
-        idFace.className = 'judgement-id-face';
-        idFace.textContent = eliminatedIdentity;
-        miniHand.appendChild(idFace);
-      }
+    if (eliminated && !eliminatedDiscardedAt){
+      const idFace = document.createElement('div');
+      idFace.className = 'judgement-id-face';
+      applyIdentityCardFace(idFace, eliminatedIdentity, { face:true });
+      miniHand.appendChild(idFace);
+    }
 
       // ★ 5：使用者だけ、左に正体カード裏を置く（mini-handの中に置く）
       if (iAmWitnessBy){
@@ -5847,7 +5860,7 @@ function renderPlayerCircle(players){
         miniHand.appendChild(miniCircle);
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
-        idFace.textContent = eliminatedIdentity;
+        applyIdentityCardFace(idFace, eliminatedIdentity, { face:true });
         miniHand.appendChild(idFace);
         tag.appendChild(miniHand);
       } else if (iAmGun2By && p.id !== state.userId){
