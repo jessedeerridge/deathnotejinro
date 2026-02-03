@@ -1429,10 +1429,12 @@ let judgementLastPoint = null;
 let judgementHasStroke = false;
 let judgementStrokeCount = 0;
 let judgementCountdownTimer = null;
+let judgementRevealTimer = null;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 let judgementFadeInMain = false;
+const JUDGEMENT_NOTE_DISPLAY_MS = 1000;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -3303,6 +3305,10 @@ function syncJudgementUI(){
       clearTimeout(judgementCountdownTimer);
       judgementCountdownTimer = null;
     }
+    if (judgementRevealTimer){
+      clearTimeout(judgementRevealTimer);
+      judgementRevealTimer = null;
+    }
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
@@ -3313,6 +3319,10 @@ function syncJudgementUI(){
   if (j.phase !== 'countdown' && judgementCountdownTimer){
     clearTimeout(judgementCountdownTimer);
     judgementCountdownTimer = null;
+  }
+  if (j.phase !== 'reveal' && judgementRevealTimer){
+    clearTimeout(judgementRevealTimer);
+    judgementRevealTimer = null;
   }
 
   if (j.phase === 'countdown'){
@@ -3391,9 +3401,15 @@ function syncJudgementUI(){
   if (j.phase === 'reveal' || j.showNote){
     const revealAt = Number(j.revealedAt || Date.now());
     const elapsed = Date.now() - revealAt;
-    const shouldShowNote = elapsed < 1000;
+    const shouldShowNote = elapsed < JUDGEMENT_NOTE_DISPLAY_MS;
     if (shouldShowNote){
       openJudgementNotebook(false);
+      if (!judgementRevealTimer){
+        judgementRevealTimer = setTimeout(() => {
+          judgementRevealTimer = null;
+          syncJudgementUI();
+        }, Math.max(0, JUDGEMENT_NOTE_DISPLAY_MS - elapsed));
+      }
     } else {
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
@@ -3513,7 +3529,7 @@ async function finishJudgementNoZero(){
 
 async function resolveJudgementRevealSequence(revealedAt){
   if (!state.roomCode) return;
-  const waitMs = Math.max(0, 1200 - (Date.now() - Number(revealedAt || Date.now())));
+  const waitMs = Math.max(0, JUDGEMENT_NOTE_DISPLAY_MS - (Date.now() - Number(revealedAt || Date.now())));
   await sleep(waitMs);
 
   await withJudgementLock(async () => {
