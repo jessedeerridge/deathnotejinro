@@ -3653,9 +3653,7 @@ function canKiraUseAlibiNo(){
   if (!isKira()) return false;
   if (!myHandHasCard('4')) return false;
   const meta = state.arrest1Meta || {};
-  const used = !!meta.kiraAlibiUsed;
-  const count = Number(meta.kiraNominationCount || 0);
-  return !used && count === 0;
+  return !meta.kiraAlibiUsed;
 }
 
 function syncArrestPop(){
@@ -3747,10 +3745,8 @@ async function updateKiraArrestMeta({ usedAlibi } = {}){
   const metaRef = ref(db, `rooms/${state.roomCode}/arrest1Meta`);
   await runTransaction(metaRef, (cur) => {
     const base = (cur && typeof cur === 'object') ? cur : {};
-    const count = Number(base.kiraNominationCount || 0) + 1;
     const alibiUsed = !!base.kiraAlibiUsed || !!usedAlibi;
     return {
-      kiraNominationCount: count,
       kiraAlibiUsed: alibiUsed
     };
   }, { applyLocally:false });
