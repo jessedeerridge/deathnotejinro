@@ -997,6 +997,10 @@
     cursor:grab;
   }
   .my-hand.is-playable .my-card:active{ cursor:grabbing; }
+  .my-hand.is-playable .my-card.play-disabled:not(.min-target){
+    animation:none;
+    cursor:default;
+  }
 
   /* ★ 8：交換で「返すカードを選ぶ」 */
   .my-hand.exchange-pick .my-card{
@@ -1930,6 +1934,7 @@ function getMyIdentity(){ return state.hands?.[state.userId]?.identity || null; 
 function isKira(){ return getMyIdentity() === 'キラ'; }
 function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' || id === '信者'; }
 function isPolice(){ const id = getMyIdentity(); return id === '警察1' || id === '警察2'; }
+function isL(){ return getMyIdentity() === 'L'; }
 function myHandHasCard(cardId){
   const cards = state.hands?.[state.userId]?.cards;
   if (!Array.isArray(cards)) return false;
@@ -1956,6 +1961,13 @@ function calcIsPlayable(){
   const aActive   = isArrestActive();
 
   return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && (count === 3);
+}
+
+function canPlayCardOnTurn(cardId){
+  const id = String(cardId || '');
+  if (id === '1') return isL();
+  if (id === '2') return isPolice();
+  return true;
 }
 
 /* =========================
@@ -2498,7 +2510,10 @@ function subscribeDiscard(){
     }
     if (discList.length > prevCount){
       const added = discList.slice(prevCount);
-      animateDiscardEntries(added);
+      const animateEntries = added.filter(entry => !(entry?.reason === 'play' && entry?.by === state.userId));
+      if (animateEntries.length){
+        animateDiscardEntries(animateEntries);
+      }
     }
     lastDiscardCount = discList.length;
   });
@@ -2865,6 +2880,7 @@ function onCardPointerDown(e){
 
   const idx = Number(cardEl.dataset.index);
   if (!Number.isFinite(idx)) return;
+  if (!canPlayCardOnTurn(cardEl.dataset.cardId)) return;
 
   drag.active = true;
   drag.cardIndex = idx;
@@ -2905,7 +2921,7 @@ async function onCardPointerUp(e){
   const shouldPlay = drag.overCenter;
   cleanupDrag();
 
-  if (shouldPlay) await playCardFromHand(idx);
+  if (shouldPlay && canPlayCardOnTurn(cardEl.dataset.cardId)) await playCardFromHand(idx);
   try { cardEl.releasePointerCapture(e.pointerId); } catch {}
 }
 
@@ -4595,6 +4611,9 @@ function renderMyHand(){
     applyCardFace(card, v);
     card.dataset.index = String(i);
     card.dataset.cardId = String(v);
+    if (state.isPlayable && !canPlayCardOnTurn(v)){
+      card.classList.add('play-disabled');
+    }
 
     if (shouldMarkNewLast && i === cards.length - 1){
       card.classList.add('new-in');
