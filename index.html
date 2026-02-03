@@ -1429,6 +1429,7 @@ let judgementLastPoint = null;
 let judgementHasStroke = false;
 let judgementStrokeCount = 0;
 let judgementCountdownTimer = null;
+let judgementRevealTimer = null;
 let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
@@ -3304,6 +3305,10 @@ function syncJudgementUI(){
       clearTimeout(judgementCountdownTimer);
       judgementCountdownTimer = null;
     }
+    if (judgementRevealTimer){
+      clearTimeout(judgementRevealTimer);
+      judgementRevealTimer = null;
+    }
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
@@ -3314,6 +3319,10 @@ function syncJudgementUI(){
   if (j.phase !== 'countdown' && judgementCountdownTimer){
     clearTimeout(judgementCountdownTimer);
     judgementCountdownTimer = null;
+  }
+  if (j.phase !== 'reveal' && judgementRevealTimer){
+    clearTimeout(judgementRevealTimer);
+    judgementRevealTimer = null;
   }
 
   if (j.phase === 'countdown'){
@@ -3395,6 +3404,12 @@ function syncJudgementUI(){
     const shouldShowNote = elapsed < JUDGEMENT_NOTE_DISPLAY_MS;
     if (shouldShowNote){
       openJudgementNotebook(false);
+      if (!judgementRevealTimer){
+        judgementRevealTimer = setTimeout(() => {
+          judgementRevealTimer = null;
+          syncJudgementUI();
+        }, Math.max(0, JUDGEMENT_NOTE_DISPLAY_MS - elapsed));
+      }
     } else {
       judgementNotebook?.classList.add('hidden');
       judgementNotebook?.classList.remove('open');
