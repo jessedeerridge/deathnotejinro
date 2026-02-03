@@ -1734,17 +1734,17 @@ const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
-  { id: "0", name: "デスノート", effect: "持っていたら死ぬ", image: "デスノート.jpg" },
-  { id: "1", name: "逮捕", effect: "お得なカード", image: "逮捕.jpg" },
-  { id: "2", name: "拳銃", effect: "小さいカードを見る", image: "拳銃.jpg" },
-  { id: "3", name: "偽名", effect: "死なない時がある", image: "偽名.jpg" },
-  { id: "4", name: "アリバイ", effect: "ちょっと有利", image: "アリバイ.jpg" },
-  { id: "5", name: "証人", effect: "正体を見る", image: "証人.jpg" },
-  { id: "6", name: "監視", effect: "ちょっと見る", image: "監視.jpg" },
-  { id: "7", name: "投票", effect: "みんなで投票する", image: "投票.jpg" },
-  { id: "8", name: "交換", effect: "カードを効果塗る", image: "交換.jpg" },
-  { id: "9", name: "尋問", effect: "カードを移動する", image: "尋問.jpg" },
-  { id: "13", name: "死神", effect: "強くなる", image: "死神.jpg" },
+  { id: "0", name: "デスノート", effect: "", image: "デスノート.jpg" },
+  { id: "1", name: "逮捕", effect: "Lだけが使える。", image: "逮捕.jpg" },
+  { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
+  { id: "3", name: "偽名", effect: "ノートに名前を書かれても一度だけ死なない。", image: "偽名.jpg" },
+  { id: "4", name: "アリバイ", effect: "このカードがあれば、あなたがキラでも一度だけ逮捕されない。その時にこのカードは見せない。", image: "アリバイ.jpg" },
+  { id: "5", name: "証人", effect: "選んだプレイヤーの正体カードをこっそり見る。", image: "証人.jpg" },
+  { id: "6", name: "監視", effect: "選んだプレイヤーの手札カードをこっそり見る。", image: "監視.jpg" },
+  { id: "7", name: "投票", effect: "全員同時にキラだと思うプレイヤーを指さす。", image: "投票.jpg" },
+  { id: "8", name: "交換", effect: "選んだプレイヤーから最小を受け取った後、好きなカードを渡す。", image: "交換.jpg" },
+  { id: "9", name: "取調", effect: "右か左かを選ぶ。全員、最小を隣のプレイヤーに渡す。", image: "取調.jpg" },
+  { id: "13", name: "死神", effect: "全員が目を閉じ、キラはデスノートを持っているプレイヤーを知る。", image: "死神.jpg" },
 ];
 const CARD_LOOKUP = new Map(CARD_LIBRARY.map(card => [card.id, card]));
 const ROLE_HELP = CARD_LIBRARY.map(card => ({
