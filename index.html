@@ -666,6 +666,91 @@
     cursor:not-allowed;
   }
 
+  .arrest-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:10px 12px;
+    z-index:86;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    min-width:260px;
+  }
+  .arrest-pop.hidden{ display:none; }
+  .arrest-pop .msg{ font-weight:900; font-size:14px; text-align:center; }
+
+  .arrest-overlay{
+    position:fixed;
+    inset:0;
+    display:grid;
+    place-items:center;
+    background:rgba(0,0,0,.45);
+    z-index:90;
+  }
+  .arrest-overlay.hidden{ display:none; }
+  .arrest-overlay .arrest-image{
+    width:min(68vw, 520px);
+    height:min(68vw, 520px);
+    max-width:520px;
+    max-height:520px;
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    filter:drop-shadow(0 18px 40px rgba(0,0,0,.35));
+  }
+  .arrest-overlay .arrest-image.no{ background-image:url('dnno.jpg'); }
+  .arrest-overlay .arrest-image.yes{ background-image:url('dnyes.jpg'); }
+  .arrest-yes-stack{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:18px;
+  }
+  .arrest-kira-card{
+    position:relative;
+    width:170px;
+    height:250px;
+  }
+  .arrest-kira-half{
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    border:2px solid rgba(0,0,0,.35);
+    background:#fff;
+    color:#111;
+    font-weight:900;
+    font-size:32px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 18px 40px rgba(0,0,0,.25);
+  }
+  .arrest-kira-half.left{
+    clip-path:polygon(0 0, 52% 0, 48% 100%, 0 100%);
+    animation: arrestBreakLeft 1800ms ease forwards;
+  }
+  .arrest-kira-half.right{
+    clip-path:polygon(52% 0, 100% 0, 100% 100%, 48% 100%);
+    animation: arrestBreakRight 1800ms ease forwards;
+  }
+  @keyframes arrestBreakLeft{
+    0%{ transform:translateX(0) rotate(0); opacity:1; }
+    60%{ transform:translateX(-18px) rotate(-6deg); opacity:1; }
+    100%{ transform:translateX(-46px) rotate(-14deg); opacity:0; }
+  }
+  @keyframes arrestBreakRight{
+    0%{ transform:translateX(0) rotate(0); opacity:1; }
+    60%{ transform:translateX(18px) rotate(6deg); opacity:1; }
+    100%{ transform:translateX(46px) rotate(14deg); opacity:0; }
+  }
+
   .judgement-pop{
     position:fixed;
     top:50%;
@@ -1179,6 +1264,40 @@
   }
   .witness-pop.hidden{display:none;}
 
+  /* ★ 1：逮捕（正体カードパルス） */
+  @keyframes arrestIdPulse{
+    0%  { transform:translate(-50%,0) scale(0.96); }
+    50% { transform:translate(-50%,0) scale(1.12); }
+    100%{ transform:translate(-50%,0) scale(0.96); }
+  }
+  .arrest-id-card{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.22);
+    background-image:url('dnura.jpg');
+    background-size:cover;
+    background-position:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    animation: arrestIdPulse 760ms ease-in-out infinite;
+    z-index:30;
+    pointer-events:none;
+  }
+  .player-tag .arrest-id-card{
+    margin-left:-40px;
+  }
+  .arrest-id-card.targetable{
+    cursor:pointer;
+    pointer-events:auto;
+    box-shadow:0 0 0 2px rgba(17,17,17,.14), 0 2px 8px rgba(0,0,0,.18);
+  }
+  .player-tag.arrest-selected{
+    box-shadow:0 0 0 2px rgba(17,17,17,.2);
+  }
+
   /* ★ 7：投票 */
   .vote-pop{
     position:fixed;
@@ -1318,6 +1437,29 @@
   <div class="dialog-buttons">
     <button id="btnGun2No" class="btn ghost">いいえ</button>
     <button id="btnGun2Yes" class="btn primary">はい</button>
+  </div>
+</div>
+
+<!-- ★ 1：逮捕（対象ポップ） -->
+<div id="arrestPop" class="arrest-pop hidden" aria-hidden="true">
+  <div class="msg">Are you Kira?</div>
+  <div class="dialog-buttons">
+    <button id="btnArrestNo" class="btn ghost">No</button>
+    <button id="btnArrestYes" class="btn primary">Yes</button>
+  </div>
+</div>
+
+<div id="arrestNoOverlay" class="arrest-overlay hidden" aria-hidden="true">
+  <div class="arrest-image no"></div>
+</div>
+
+<div id="arrestYesOverlay" class="arrest-overlay hidden" aria-hidden="true">
+  <div class="arrest-yes-stack">
+    <div class="arrest-kira-card">
+      <div class="arrest-kira-half left">キラ</div>
+      <div class="arrest-kira-half right">キラ</div>
+    </div>
+    <div class="arrest-image yes"></div>
   </div>
 </div>
 
@@ -1471,6 +1613,8 @@ const state = {
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
   judgement: null,     // ★ 裁き
+  arrest1: null,       // ★ 1（逮捕）
+  arrest1Meta: null,   // ★ 1（逮捕）メタ
   eliminated: {},      // ★ 脱落
 };
 
@@ -1551,6 +1695,13 @@ const btnShinigamiCloseYes = document.getElementById('btnShinigamiCloseYes');
 const gun2ConfirmPop = document.getElementById('gun2ConfirmPop');
 const btnGun2Yes = document.getElementById('btnGun2Yes');
 const btnGun2No = document.getElementById('btnGun2No');
+
+/* ★ 1（逮捕）対象ポップ */
+const arrestPop = document.getElementById('arrestPop');
+const btnArrestYes = document.getElementById('btnArrestYes');
+const btnArrestNo = document.getElementById('btnArrestNo');
+const arrestNoOverlay = document.getElementById('arrestNoOverlay');
+const arrestYesOverlay = document.getElementById('arrestYesOverlay');
 
 /* ★ 裁き */
 const judgementPop = document.getElementById('judgementPop');
@@ -1664,6 +1815,7 @@ let lastTransferEventId = null;
 let lastExchangeEventId = null;
 let lastDiscardCount = 0;
 let discardLoaded = false;
+let lastArrestEventId = null;
 
 let localPicked = null;
 let localExchangePicked = null;
@@ -1739,6 +1891,13 @@ function vote7Phase(){ return String(state.vote7?.phase || ''); }
 function isVote7Voting(){ return isVote7Active() && vote7Phase() === 'voting'; }
 function isVote7Revealing(){ return isVote7Active() && vote7Phase() === 'reveal'; }
 
+/* ★ 1（逮捕） */
+function isArrestActive(){ return !!state.arrest1?.active; }
+function arrestPhase(){ return String(state.arrest1?.phase || ''); }
+function getArrest1(){ return (state.arrest1 && typeof state.arrest1 === 'object') ? state.arrest1 : null; }
+function isArrestPickingTarget(){ return isArrestActive() && arrestPhase() === 'pickTarget'; }
+function isArrestQuestion(){ return isArrestActive() && arrestPhase() === 'question'; }
+
 /* ★ 2（拳銃） */
 function isGun2Active(){ return !!state.gun2?.active; }
 function gun2Phase(){ return String(state.gun2?.phase || ''); }
@@ -1754,6 +1913,11 @@ function getMyIdentity(){ return state.hands?.[state.userId]?.identity || null; 
 function isKira(){ return getMyIdentity() === 'キラ'; }
 function canSeeShinigami(){ const id = getMyIdentity(); return id === 'キラ' || id === '信者'; }
 function isPolice(){ const id = getMyIdentity(); return id === '警察1' || id === '警察2'; }
+function myHandHasCard(cardId){
+  const cards = state.hands?.[state.userId]?.cards;
+  if (!Array.isArray(cards)) return false;
+  return cards.includes(String(cardId));
+}
 function isJudgementActive(){ return !!state.judgement?.active; }
 function getJudgement(){ return (state.judgement && typeof state.judgement === 'object') ? state.judgement : null; }
 function isEliminated(playerId){ return !!state.eliminated?.[playerId]; }
@@ -1772,8 +1936,9 @@ function calcIsPlayable(){
   const sActive   = isShinigamiActive();
   const gActive   = isGun2Active();
   const jActive   = isJudgementActive();
+  const aActive   = isArrestActive();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && (count === 3);
+  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && (count === 3);
 }
 
 /* =========================
@@ -2255,6 +2420,8 @@ function updateTurnUI(){
   syncShinigamiClosePop();
   // ★ 2：使用確認
   syncGun2ConfirmPop();
+  // ★ 1：Are you Kira?
+  syncArrestPop();
 }
 
 function updateHostUI(){
@@ -2550,6 +2717,41 @@ function subscribeGun2(){
 
     updateTurnUI();
     renderHands();
+  });
+}
+
+/* ★ 1（逮捕）購読 */
+function subscribeArrest1(){
+  const aRef = ref(db, `rooms/${state.roomCode}/arrest1`);
+  onValue(aRef, snap => {
+    const a = snap.val() || null;
+    state.arrest1 = (a && typeof a === 'object') ? a : null;
+    updateTurnUI();
+    renderPlayerCircle(latestPlayers);
+  });
+}
+
+function subscribeArrest1Meta(){
+  const metaRef = ref(db, `rooms/${state.roomCode}/arrest1Meta`);
+  onValue(metaRef, snap => {
+    const meta = snap.val() || null;
+    state.arrest1Meta = (meta && typeof meta === 'object') ? meta : null;
+    syncArrestPop();
+  });
+}
+
+function subscribeArrest1Event(){
+  const evRef = ref(db, `rooms/${state.roomCode}/arrest1Event`);
+  onValue(evRef, snap => {
+    const ev = snap.val();
+    if (!ev || !ev.id) return;
+    if (ev.id === lastArrestEventId) return;
+    lastArrestEventId = ev.id;
+    const now = Date.now();
+    if (ev.at && (now - ev.at) > 8000) return;
+    if (ev.type === 'yes' || ev.type === 'no'){
+      showArrestOverlay(ev.type);
+    }
   });
 }
 
@@ -3444,6 +3646,153 @@ btnGun2No?.addEventListener('click', async (e) => {
   gun2ConfirmPending = false;
   syncGun2ConfirmPop();
   await advanceTurnToNextPlayer();
+});
+
+/* =========================
+   ★ 1：逮捕（Are you Kira?）
+   ========================= */
+function canKiraUseAlibiNo(){
+  if (!isKira()) return false;
+  if (!myHandHasCard('4')) return false;
+  const meta = state.arrest1Meta || {};
+  return !meta.kiraAlibiUsed;
+}
+
+function syncArrestPop(){
+  if (!arrestPop) return;
+  const a = getArrest1();
+  const shouldShow = !!(a?.active && a.phase === 'question' && a.targetId === state.userId);
+  arrestPop.classList.toggle('hidden', !shouldShow);
+  arrestPop.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+  if (!shouldShow) return;
+
+  const iAmKira = isKira();
+  const allowNo = iAmKira ? canKiraUseAlibiNo() : true;
+
+  if (btnArrestYes){
+    btnArrestYes.disabled = !iAmKira;
+    btnArrestYes.classList.toggle('disabled', !iAmKira);
+  }
+  if (btnArrestNo){
+    const disableNo = iAmKira ? !allowNo : false;
+    btnArrestNo.disabled = disableNo;
+    btnArrestNo.classList.toggle('disabled', disableNo);
+  }
+}
+
+function showArrestOverlay(type){
+  const isNo = type === 'no';
+  const overlay = isNo ? arrestNoOverlay : arrestYesOverlay;
+  if (!overlay) return;
+  if (!arrestNoOverlay || !arrestYesOverlay) return;
+  arrestNoOverlay.classList.add('hidden');
+  arrestNoOverlay.setAttribute('aria-hidden', 'true');
+  arrestYesOverlay.classList.add('hidden');
+  arrestYesOverlay.setAttribute('aria-hidden', 'true');
+
+  overlay.classList.remove('hidden');
+  overlay.setAttribute('aria-hidden', 'false');
+
+  if (!isNo){
+    const halves = overlay.querySelectorAll('.arrest-kira-half');
+    halves.forEach((half) => {
+      half.style.animation = 'none';
+      void half.offsetWidth;
+      half.style.animation = '';
+    });
+  }
+
+  setTimeout(() => {
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+  }, 1800);
+}
+
+async function startArrest1(byPlayerId){
+  if (!state.roomCode) return;
+  const aRef = ref(db, `rooms/${state.roomCode}/arrest1`);
+  const snap = await get(aRef);
+  const cur = snap.val();
+  if (cur?.active) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+
+  await set(aRef, {
+    active: true,
+    phase: 'pickTarget',
+    by: byPlayerId,
+    targetId: null,
+    at: Date.now()
+  });
+}
+
+async function pickArrest1Target(targetId){
+  if (!state.roomCode) return;
+  const a = getArrest1();
+  if (!a?.active) return;
+  if (a.phase !== 'pickTarget') return;
+  if (a.by !== state.userId) return;
+  if (!targetId || targetId === state.userId) return;
+  if (isEliminated(targetId)) return;
+
+  await update(ref(db, `rooms/${state.roomCode}/arrest1`), {
+    phase: 'question',
+    targetId,
+    updatedAt: Date.now()
+  });
+}
+
+async function updateKiraArrestMeta({ usedAlibi } = {}){
+  if (!state.roomCode) return;
+  const metaRef = ref(db, `rooms/${state.roomCode}/arrest1Meta`);
+  await runTransaction(metaRef, (cur) => {
+    const base = (cur && typeof cur === 'object') ? cur : {};
+    const alibiUsed = !!base.kiraAlibiUsed || !!usedAlibi;
+    return {
+      kiraAlibiUsed: alibiUsed
+    };
+  }, { applyLocally:false });
+}
+
+async function resolveArrest1Answer(answer){
+  if (!state.roomCode) return;
+  const a = getArrest1();
+  if (!a?.active || a.phase !== 'question') return;
+  if (a.targetId !== state.userId) return;
+  if (answer !== 'yes' && answer !== 'no') return;
+
+  const iAmKira = isKira();
+  if (answer === 'yes' && !iAmKira) return;
+  if (answer === 'no' && iAmKira && !canKiraUseAlibiNo()) return;
+
+  if (iAmKira){
+    await updateKiraArrestMeta({ usedAlibi: answer === 'no' });
+  }
+
+  const eventId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const updates = {};
+  updates[`rooms/${state.roomCode}/arrest1`] = null;
+  updates[`rooms/${state.roomCode}/arrest1Event`] = {
+    id: eventId,
+    type: answer,
+    at: Date.now()
+  };
+  updates[`rooms/${state.roomCode}/turn/paused`] = false;
+  await update(ref(db, `/`), updates);
+
+  await advanceTurnToNextPlayer();
+}
+
+btnArrestYes?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (arrestPop?.classList.contains('hidden')) return;
+  await resolveArrest1Answer('yes');
+});
+
+btnArrestNo?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (arrestPop?.classList.contains('hidden')) return;
+  await resolveArrest1Answer('no');
 });
 
 /* =========================
@@ -4758,6 +5107,11 @@ async function playCardFromHand(cardIndex){
     return;
   }
 
+  if (used === "1"){
+    await startArrest1(myId);
+    return;
+  }
+
   if (used === "13"){
     await startShinigami13(myId);
     return;
@@ -4791,6 +5145,7 @@ async function advanceTurnToNextPlayer(){
   if (isShinigamiActive()) return;
   if (isJudgementActive()) return;
   if (isGun2Active()) return;
+  if (isArrestActive()) return;
 
   const players = await getSeatedPlayers();
   const activePlayers = players.filter(p => !isEliminated(p.id));
@@ -4913,6 +5268,10 @@ btnJoin.addEventListener('click', async () => {
   subscribeShinigami13();
   // ★ 2（拳銃）
   subscribeGun2();
+  // ★ 1（逮捕）
+  subscribeArrest1();
+  subscribeArrest1Meta();
+  subscribeArrest1Event();
   // ★ 裁き
   subscribeJudgement();
 
@@ -5093,6 +5452,9 @@ function renderPlayerCircle(players){
   const sh = getShinigami13();
   const g = getGun2();
   const iAmGun2By = !!(g?.active && g?.phase === 'pickTarget' && g?.by === state.userId);
+  const arrest = getArrest1();
+  const arrestActive = !!arrest?.active;
+  const isArrestByMe = arrestActive && arrest.phase === 'pickTarget' && arrest.by === state.userId;
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
@@ -5110,6 +5472,10 @@ function renderPlayerCircle(players){
     nameSpan.className = 'player-name';
     nameSpan.textContent = p.name;
     tag.appendChild(nameSpan);
+
+    if (arrestActive && arrest?.targetId && arrest.targetId === p.id){
+      tag.classList.add('arrest-selected');
+    }
 
     if (invActive && invPhase() === 'pickMin'){
       const picked = !!selections?.[p.id] && Number.isFinite(Number(selections?.[p.id]?.idx));
@@ -5208,6 +5574,7 @@ function renderPlayerCircle(players){
         }
       }
     }
+
     if (eliminated && eliminatedDiscardedAt){
       const idSlide = document.createElement('div');
       idSlide.className = 'eliminated-identity-card';
@@ -5227,6 +5594,16 @@ function renderPlayerCircle(players){
       const miniCircle = document.createElement('div');
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
+
+      if (isArrestByMe && !eliminated){
+        const arrestCard = document.createElement('div');
+        arrestCard.className = 'arrest-id-card targetable';
+        arrestCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickArrest1Target(p.id);
+        });
+        miniHand.appendChild(arrestCard);
+      }
 
       if (eliminated && !eliminatedDiscardedAt){
         const idFace = document.createElement('div');
@@ -5322,6 +5699,20 @@ function renderPlayerCircle(players){
         });
         miniHand.appendChild(idBack);
         tag.appendChild(miniHand);
+      } else if (isArrestByMe && p.id !== state.userId && !eliminated){
+        const miniHand = document.createElement('div');
+        miniHand.className = 'mini-hand';
+        const miniCircle = document.createElement('div');
+        miniCircle.className = 'mini-hand-circle';
+        miniHand.appendChild(miniCircle);
+        const arrestCard = document.createElement('div');
+        arrestCard.className = 'arrest-id-card targetable';
+        arrestCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickArrest1Target(p.id);
+        });
+        miniHand.appendChild(arrestCard);
+        tag.appendChild(miniHand);
       } else if (eliminated && !eliminatedDiscardedAt && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
@@ -5400,11 +5791,11 @@ function buildDeckForPlayers(playerCount){
   const deck = [];
 
   if (playerCount <= 4){
-    pushN(deck, 0, 50);
-    pushN(deck, 1, 1);
+    pushN(deck, 0, 1);
+    pushN(deck, 1, 20);
     pushN(deck, 2, 1);
     pushN(deck, 3, 1);
-    pushN(deck, 5, 10);
+    pushN(deck, 5, 1);
     pushN(deck, 4, 1);
     pushN(deck, 6, 1);
     pushN(deck, 7, 2);
@@ -5520,6 +5911,9 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/judgement`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementLock`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementMeta`), null),
+    set(ref(db, `rooms/${state.roomCode}/arrest1`), null),
+    set(ref(db, `rooms/${state.roomCode}/arrest1Meta`), null),
+    set(ref(db, `rooms/${state.roomCode}/arrest1Event`), null),
   ]);
 
   if (initialDrawDisp){
@@ -5565,6 +5959,9 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/judgement`)),
     remove(ref(db, `${base}/judgementLock`)),
     remove(ref(db, `${base}/judgementMeta`)),
+    remove(ref(db, `${base}/arrest1`)),
+    remove(ref(db, `${base}/arrest1Meta`)),
+    remove(ref(db, `${base}/arrest1Event`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
