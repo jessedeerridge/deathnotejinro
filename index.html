@@ -593,6 +593,29 @@
   .witness-close-pop.hidden{ display:none; }
   .witness-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
+  /* ★ 3：偽名（裁き回避の表示） */
+  .alias3-backdrop{
+    position:fixed;
+    inset:0;
+    background:transparent;
+    z-index:84;
+    display:block;
+    pointer-events:none;
+  }
+  .alias3-backdrop.hidden{ display:none; }
+  .alias3-card{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%) scale(1.06);
+    width:130px; height:195px;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,.18);
+    background:#111;
+    display:flex;align-items:stretch;justify-content:stretch;
+    box-shadow:0 18px 44px rgba(0,0,0,.22);
+    user-select:none;
+  }
+
   /* ★ 13：死神（扇手札の1枚を表で0表示） */
   .mini-card.shinigami-face{
     background:#111;
@@ -1487,6 +1510,11 @@
   <button id="btnJudgementWriteYes" class="btn primary">はい</button>
 </div>
 
+<!-- ★ 3：偽名（裁き回避のカード表示） -->
+<div id="alias3Backdrop" class="alias3-backdrop hidden" aria-hidden="true">
+  <div id="alias3Card" class="alias3-card"></div>
+</div>
+
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
@@ -1717,6 +1745,10 @@ const judgementFadeHome = judgementFade?.parentElement || null;
 const judgementFadeNextSibling = judgementFade?.nextSibling || null;
 const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 
+/* ★ 3（偽名） */
+const alias3Backdrop = document.getElementById('alias3Backdrop');
+const alias3CardEl = document.getElementById('alias3Card');
+
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
   { id: "0", name: "デスノート", effect: "持っていたら死ぬ", image: "デスノート.jpg" },
@@ -1831,7 +1863,9 @@ let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 let judgementFadeInMain = false;
+let alias3RevealTimer = null;
 const JUDGEMENT_NOTE_DISPLAY_MS = 1500;
+const ALIAS3_REVEAL_MS = 1600;
 
 function generateRoomCode(length = 6){
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -3846,6 +3880,15 @@ function showJudgementWritePop(show){
   judgementWritePop.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
 
+function showAlias3Reveal(show){
+  if (!alias3Backdrop || !alias3CardEl) return;
+  alias3Backdrop.classList.toggle('hidden', !show);
+  alias3Backdrop.setAttribute('aria-hidden', show ? 'false' : 'true');
+  if (!show) return;
+  alias3CardEl.innerHTML = '';
+  alias3CardEl.appendChild(buildCardFace('3'));
+}
+
 function openJudgementNotebook(enableDraw){
   if (!judgementNotebook) return;
   judgementNotebook.classList.remove('hidden');
@@ -3894,6 +3937,7 @@ function syncJudgementUI(){
     showJudgementMessage(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
+    showAlias3Reveal(false);
     judgementHasStroke = false;
     judgementStrokeCount = 0;
     judgementLastTargetId = null;
@@ -3905,6 +3949,10 @@ function syncJudgementUI(){
     if (judgementRevealTimer){
       clearTimeout(judgementRevealTimer);
       judgementRevealTimer = null;
+    }
+    if (alias3RevealTimer){
+      clearTimeout(alias3RevealTimer);
+      alias3RevealTimer = null;
     }
     if (!j?.showNote){
       judgementNotebook?.classList.add('hidden');
@@ -4034,6 +4082,20 @@ function syncJudgementUI(){
       resolveJudgementRevealSequence(j.revealedAt).catch(console.warn);
     }
   }
+
+  const aliasRevealAt = Number(j.aliasRevealAt || 0);
+  const aliasElapsed = Date.now() - aliasRevealAt;
+  const shouldShowAlias = !!aliasRevealAt && aliasElapsed < ALIAS3_REVEAL_MS;
+  showAlias3Reveal(shouldShowAlias);
+  if (shouldShowAlias && !alias3RevealTimer){
+    alias3RevealTimer = setTimeout(() => {
+      alias3RevealTimer = null;
+      syncJudgementUI();
+    }, Math.max(0, ALIAS3_REVEAL_MS - aliasElapsed));
+  } else if (!shouldShowAlias && alias3RevealTimer){
+    clearTimeout(alias3RevealTimer);
+    alias3RevealTimer = null;
+  }
 }
 
 function getCurrentRound(playerCount){
@@ -4150,7 +4212,23 @@ async function resolveJudgementRevealSequence(revealedAt){
     if (Number(latest.revealedAt || 0) !== Number(revealedAt || 0)) return;
 
     if (latest.targetId){
-      await executeJudgementElimination(latest.targetId);
+      const aliasApplied = await tryUseAlias3JudgementProtection(latest.targetId);
+      if (aliasApplied){
+        const aliasAt = Date.now();
+        await update(ref(db, `rooms/${state.roomCode}/judgement`), {
+          aliasRevealAt: aliasAt,
+          aliasTargetId: latest.targetId,
+          updatedAt: Date.now()
+        });
+        await sleep(ALIAS3_REVEAL_MS);
+        await update(ref(db, `rooms/${state.roomCode}/judgement`), {
+          aliasRevealAt: null,
+          aliasTargetId: null,
+          updatedAt: Date.now()
+        });
+      } else {
+        await executeJudgementElimination(latest.targetId);
+      }
     }
 
     await sleep(1200);
@@ -4158,6 +4236,23 @@ async function resolveJudgementRevealSequence(revealedAt){
     await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
     await advanceTurnToNextPlayerWithDraw();
   });
+}
+
+async function tryUseAlias3JudgementProtection(targetId){
+  if (!state.roomCode || !targetId) return false;
+  const handSnap = await get(ref(db, `rooms/${state.roomCode}/hands/${targetId}`));
+  const hand = handSnap.val();
+  const cards = Array.isArray(hand?.cards) ? hand.cards : [];
+  if (!cards.includes('3')) return false;
+
+  const usedAt = Date.now();
+  const usedRef = ref(db, `rooms/${state.roomCode}/alias3Used/${targetId}`);
+  const res = await runTransaction(usedRef, (cur) => {
+    if (cur?.usedAt) return cur;
+    return { usedAt };
+  }, { applyLocally:false });
+  const record = res.snapshot.val();
+  return !!record?.usedAt && record.usedAt === usedAt;
 }
 
 async function pickJudgementTarget(targetId){
@@ -5911,6 +6006,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/judgement`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementLock`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementMeta`), null),
+    set(ref(db, `rooms/${state.roomCode}/alias3Used`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Meta`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Event`), null),
@@ -5959,6 +6055,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/judgement`)),
     remove(ref(db, `${base}/judgementLock`)),
     remove(ref(db, `${base}/judgementMeta`)),
+    remove(ref(db, `${base}/alias3Used`)),
     remove(ref(db, `${base}/arrest1`)),
     remove(ref(db, `${base}/arrest1Meta`)),
     remove(ref(db, `${base}/arrest1Event`)),
