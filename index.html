@@ -1952,6 +1952,21 @@ function myHandHasCard(cardId){
 function isJudgementActive(){ return !!state.judgement?.active; }
 function getJudgement(){ return (state.judgement && typeof state.judgement === 'object') ? state.judgement : null; }
 function isEliminated(playerId){ return !!state.eliminated?.[playerId]; }
+function shouldDisablePlayCard(cardId){
+  if (!state.isPlayable) return false;
+  const id = String(cardId ?? '');
+  if (id === '0') return true;
+  if (id === '1' && getMyIdentity() !== 'L') return true;
+  return false;
+}
+function updatePlayDisabledForHand(){
+  const cards = myHandEl?.querySelectorAll('.my-card') || [];
+  cards.forEach(cardEl => {
+    const shouldDisable = shouldDisablePlayCard(cardEl.dataset.cardId);
+    cardEl.classList.toggle('play-disabled', shouldDisable);
+    cardEl.dataset.playDisabled = shouldDisable ? 'true' : 'false';
+  });
+}
 
 function calcIsPlayable(){
   const myId = state.userId;
@@ -2368,6 +2383,7 @@ function updateTurnUI(){
   state.isMyTurn = !!state.turn.currentPlayerId && (state.turn.currentPlayerId === state.userId);
   state.isPlayable = calcIsPlayable();
   myHandEl.classList.toggle('is-playable', state.isPlayable);
+  updatePlayDisabledForHand();
 
   const ex = state.exchange8;
   const isByPick = !!(ex?.active && ex?.phase === 'byPickReturn' && ex?.by === state.userId);
@@ -2897,7 +2913,7 @@ function isPointInRect(x, y, rect){ return x >= rect.left && x <= rect.right && 
 function onCardPointerDown(e){
   const cardEl = e.currentTarget;
   if (!state.isPlayable) return;
-  if (cardEl.dataset.playDisabled === 'true') return;
+  if (shouldDisablePlayCard(cardEl.dataset.cardId)) return;
 
   const idx = Number(cardEl.dataset.index);
   if (!Number.isFinite(idx)) return;
@@ -4600,8 +4616,6 @@ function renderMyHand(){
   const myId = state.userId;
   const handData = state.hands[myId];
   const cards = Array.isArray(handData?.cards) ? handData.cards : [];
-  const isPlayPhase = calcIsPlayable();
-  const isL = getMyIdentity() === 'L';
 
   const sig = JSON.stringify(cards);
 
@@ -4641,14 +4655,6 @@ function renderMyHand(){
     applyCardFace(card, v);
     card.dataset.index = String(i);
     card.dataset.cardId = String(v);
-    const isPlayRestricted = isPlayPhase && (v === '0' || (v === '1' && !isL));
-    if (isPlayRestricted){
-      card.classList.add('play-disabled');
-      card.dataset.playDisabled = 'true';
-    } else {
-      card.dataset.playDisabled = 'false';
-    }
-
     if (shouldMarkNewLast && i === cards.length - 1){
       card.classList.add('new-in');
       setTimeout(() => card.classList.remove('new-in'), 350);
@@ -4694,6 +4700,7 @@ function renderMyHand(){
   });
 
   prevMyCardsSig = sig;
+  updatePlayDisabledForHand();
   updateTurnUI();
 }
 
