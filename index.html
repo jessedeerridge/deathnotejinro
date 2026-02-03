@@ -593,6 +593,18 @@
   .witness-close-pop.hidden{ display:none; }
   .witness-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
+  /* ★ 3：偽名（裁き回避） */
+  .mini-card.alias3-face{
+    background:#111;
+    color:#fff;
+    display:flex;
+    align-items:stretch;
+    justify-content:stretch;
+    font-weight:900;
+    font-size:12px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
+  }
+
   /* ★ 13：死神（扇手札の1枚を表で0表示） */
   .mini-card.shinigami-face{
     background:#111;
@@ -1590,6 +1602,8 @@ const EXCHANGE_WAIT_BEFORE_MOVE_MS = 1000;
 
 /* ★ 6（監視） */
 const WATCH6_MAX_AGE_MS = 60000;
+/* ★ 3（偽名）表示 */
+const ALIAS3_DISPLAY_MS = 1800;
 
 const state = {
   userId: savedUserId,
@@ -1613,6 +1627,7 @@ const state = {
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
   judgement: null,     // ★ 裁き
+  alias3Event: null,   // ★ 3（偽名）イベント
   arrest1: null,       // ★ 1（逮捕）
   arrest1Meta: null,   // ★ 1（逮捕）メタ
   eliminated: {},      // ★ 脱落
@@ -1831,6 +1846,8 @@ let judgementRevealHandledAt = null;
 let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 let judgementFadeInMain = false;
+let lastAliasEventId = null;
+let aliasRevealTimer = null;
 const JUDGEMENT_NOTE_DISPLAY_MS = 1500;
 
 function generateRoomCode(length = 6){
@@ -2546,6 +2563,37 @@ function subscribeReshuffleEvent(){
 
     const count = Number(ev.count || 0);
     animateReshuffleDiscardToDeck(count);
+  });
+}
+
+function subscribeAlias3Event(){
+  const evRef = ref(db, `rooms/${state.roomCode}/alias3Event`);
+  onValue(evRef, snap => {
+    const ev = snap.val();
+    if (!ev || !ev.id) return;
+    if (ev.id === lastAliasEventId) return;
+    lastAliasEventId = ev.id;
+
+    const now = Date.now();
+    if (ev.at && (now - ev.at) > 8000) return;
+
+    state.alias3Event = ev;
+    renderHands();
+    const elapsed = Number(now - Number(ev.at || now));
+    const remaining = Math.max(0, ALIAS3_DISPLAY_MS - elapsed);
+    if (aliasRevealTimer){
+      clearTimeout(aliasRevealTimer);
+    }
+    if (remaining > 0){
+      aliasRevealTimer = setTimeout(() => {
+        aliasRevealTimer = null;
+        state.alias3Event = null;
+        renderHands();
+      }, remaining);
+    } else {
+      state.alias3Event = null;
+      renderHands();
+    }
   });
 }
 
@@ -4150,7 +4198,16 @@ async function resolveJudgementRevealSequence(revealedAt){
     if (Number(latest.revealedAt || 0) !== Number(revealedAt || 0)) return;
 
     if (latest.targetId){
-      await executeJudgementElimination(latest.targetId);
+      const result = await executeJudgementElimination(latest.targetId);
+      if (result?.aliasUsed){
+        await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
+        await emitAlias3Event(latest.targetId);
+        await sleep(ALIAS3_DISPLAY_MS);
+        await set(ref(db, `rooms/${state.roomCode}/alias3Event`), null);
+        await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+        await advanceTurnToNextPlayerWithDraw();
+        return;
+      }
     }
 
     await sleep(1200);
@@ -4175,11 +4232,26 @@ async function pickJudgementTarget(targetId){
 }
 
 async function executeJudgementElimination(targetId){
-  if (!state.roomCode) return;
-  if (!targetId) return;
+  if (!state.roomCode) return { aliasUsed:false };
+  if (!targetId) return { aliasUsed:false };
   const identity = state.hands?.[targetId]?.identity || '？';
   const token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const elimRef = ref(db, `rooms/${state.roomCode}/eliminated/${targetId}`);
+
+  const cardsSnap = await get(ref(db, `rooms/${state.roomCode}/hands/${targetId}/cards`));
+  const cards = Array.isArray(cardsSnap.val()) ? cardsSnap.val() : [];
+  const hasAlias = cards.includes('3');
+  if (hasAlias){
+    let applied = false;
+    const aliasRes = await runTransaction(ref(db, `rooms/${state.roomCode}/alias3Used/${targetId}`), (cur) => {
+      if (cur?.used) return cur;
+      applied = true;
+      return { used:true, at: Date.now(), by: state.userId, source: 'judgement' };
+    }, { applyLocally:false });
+    if (aliasRes.committed && applied){
+      return { aliasUsed:true };
+    }
+  }
 
   const res = await runTransaction(elimRef, (cur) => {
     if (cur?.discardedAt) return cur;
@@ -4204,13 +4276,14 @@ async function executeJudgementElimination(targetId){
   }, { applyLocally:false });
 
   const record = res.snapshot.val();
-  if (!record || record.discardToken !== token) return;
+  if (!record || record.discardToken !== token) return { aliasUsed:false };
 
   await discardHandSequentially(targetId, state.userId);
   await update(elimRef, {
     discardedAt: Date.now(),
     discardToken: null
   });
+  return { aliasUsed:false };
 }
 
 async function discardHandSequentially(targetId, byId){
@@ -4672,6 +4745,17 @@ async function emitDrawEvent(playerId, seq, kind){
     playerId,
     seq: Number(seq || 0),
     kind: kind || 'turn',
+    at: Date.now()
+  });
+}
+
+async function emitAlias3Event(targetId){
+  if (!state.roomCode) return;
+  const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  await set(ref(db, `rooms/${state.roomCode}/alias3Event`), {
+    id,
+    targetId,
+    card: '3',
     at: Date.now()
   });
 }
@@ -5251,6 +5335,7 @@ btnJoin.addEventListener('click', async () => {
   subscribeTurn();
   subscribeDrawEvent();
   subscribeReshuffleEvent();
+  subscribeAlias3Event();
 
   subscribeInvestigation();
   subscribeTransferEvent();
@@ -5557,6 +5642,7 @@ function renderPlayerCircle(players){
     const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
+    const showAliasReveal = !!(state.alias3Event && state.alias3Event.targetId === p.id);
     let gun2RevealIdx = null;
     let gun2RevealCard = null;
     if (showGun2Reveal){
@@ -5573,6 +5659,12 @@ function renderPlayerCircle(players){
           gun2RevealCard = pickCard;
         }
       }
+    }
+    let aliasRevealIdx = null;
+    if (showAliasReveal){
+      const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
+      const aliasIdx = handCards.indexOf('3');
+      if (aliasIdx >= 0) aliasRevealIdx = aliasIdx;
     }
 
     if (eliminated && eliminatedDiscardedAt){
@@ -5661,6 +5753,11 @@ function renderPlayerCircle(players){
           applyCardFace(card, gun2RevealCard ?? '', { size: 'mini' });
           card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
           card.style.zIndex = String(40 + idx2);
+        } else if (showAliasReveal && Number.isFinite(Number(aliasRevealIdx)) && idx2 === Number(aliasRevealIdx)){
+          card.classList.add('alias3-face');
+          applyCardFace(card, '3', { size: 'mini' });
+          card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.25)`;
+          card.style.zIndex = String(38 + idx2);
         }
 
         miniHand.appendChild(card);
@@ -5911,6 +6008,8 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/judgement`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementLock`), null),
     set(ref(db, `rooms/${state.roomCode}/judgementMeta`), null),
+    set(ref(db, `rooms/${state.roomCode}/alias3Event`), null),
+    set(ref(db, `rooms/${state.roomCode}/alias3Used`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Meta`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Event`), null),
@@ -5959,6 +6058,8 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/judgement`)),
     remove(ref(db, `${base}/judgementLock`)),
     remove(ref(db, `${base}/judgementMeta`)),
+    remove(ref(db, `${base}/alias3Event`)),
+    remove(ref(db, `${base}/alias3Used`)),
     remove(ref(db, `${base}/arrest1`)),
     remove(ref(db, `${base}/arrest1Meta`)),
     remove(ref(db, `${base}/arrest1Event`)),
