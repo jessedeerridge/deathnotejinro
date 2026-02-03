@@ -467,7 +467,7 @@
     width:24px;height:33px;
     border-radius:4px;
     border:1px solid rgba(0,0,0,.22);
-    background-image:url('dnura.jpg');
+    background-image:url('dnroleura.jpg');
     background-size:cover;
     background-position:center;
     box-shadow:0 2px 8px rgba(0,0,0,.18);
@@ -997,6 +997,10 @@
     cursor:grab;
   }
   .my-hand.is-playable .my-card:active{ cursor:grabbing; }
+  .my-hand.is-playable .my-card.no-play{
+    animation:none;
+    cursor:default;
+  }
 
   /* ★ 8：交換で「返すカードを選ぶ」 */
   .my-hand.exchange-pick .my-card{
@@ -1044,6 +1048,14 @@
   .my-card.selected{
     outline:3px solid #111;
     outline-offset:1px;
+  }
+  .my-card.dragging{
+    opacity:0;
+  }
+  .identity-card{
+    background-size:cover;
+    background-position:center;
+    color:transparent;
   }
 
   .dialog-backdrop{
@@ -1792,6 +1804,14 @@ function buildCardFace(cardId, { size = '' } = {}){
 function applyCardFace(cardEl, cardId, { size = '' } = {}){
   cardEl.innerHTML = '';
   cardEl.appendChild(buildCardFace(cardId, { size }));
+}
+
+function applyIdentityCardFace(cardEl, identity, { face = true } = {}){
+  const imageName = face ? `${identity}.jpg` : 'dnroleura.jpg';
+  cardEl.classList.add('identity-card');
+  cardEl.style.backgroundImage = `url('${imageName}')`;
+  cardEl.textContent = '';
+  cardEl.setAttribute('aria-label', identity ? `正体カード: ${identity}` : '正体カード');
 }
 
 function renderHelpList(){
@@ -2809,11 +2829,11 @@ function renderMyIdentity(){
   const identity = state.hands[myId]?.identity;
   if (!identity){
     myIdentityEl.classList.add('hidden');
-    myIdentityEl.textContent = '？';
+    applyIdentityCardFace(myIdentityEl, '', { face:false });
     return;
   }
   myIdentityEl.classList.remove('hidden');
-  myIdentityEl.textContent = identity;
+  applyIdentityCardFace(myIdentityEl, identity, { face:true });
 }
 
 /* ====== 捨て札 ====== */
@@ -2846,15 +2866,17 @@ function renderDiscardCenter(){
 }
 
 /* ====== ドラッグ ====== */
-let drag = { active:false, cardIndex:null, pointerId:null, ghostEl:null, overCenter:false };
+let drag = { active:false, cardIndex:null, pointerId:null, ghostEl:null, overCenter:false, sourceEl:null };
 
 function cleanupDrag(){
   if (drag.ghostEl) drag.ghostEl.remove();
+  if (drag.sourceEl) drag.sourceEl.classList.remove('dragging');
   drag.active = false;
   drag.cardIndex = null;
   drag.pointerId = null;
   drag.ghostEl = null;
   drag.overCenter = false;
+  drag.sourceEl = null;
   centerArea.classList.remove('active-drop');
 }
 function isPointInRect(x, y, rect){ return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom; }
@@ -2862,6 +2884,7 @@ function isPointInRect(x, y, rect){ return x >= rect.left && x <= rect.right && 
 function onCardPointerDown(e){
   const cardEl = e.currentTarget;
   if (!state.isPlayable) return;
+  if (cardEl.classList.contains('no-play')) return;
 
   const idx = Number(cardEl.dataset.index);
   if (!Number.isFinite(idx)) return;
@@ -2869,6 +2892,8 @@ function onCardPointerDown(e){
   drag.active = true;
   drag.cardIndex = idx;
   drag.pointerId = e.pointerId;
+  drag.sourceEl = cardEl;
+  cardEl.classList.add('dragging');
 
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
@@ -2906,6 +2931,12 @@ async function onCardPointerUp(e){
   cleanupDrag();
 
   if (shouldPlay) await playCardFromHand(idx);
+  try { cardEl.releasePointerCapture(e.pointerId); } catch {}
+}
+function onCardPointerCancel(e){
+  const cardEl = e.currentTarget;
+  if (!drag.active || drag.pointerId !== e.pointerId) return;
+  cleanupDrag();
   try { cardEl.releasePointerCapture(e.pointerId); } catch {}
 }
 
@@ -4502,7 +4533,7 @@ function renderWitnessCenterHand(targetId){
 
   const card = document.createElement('div');
   card.className = 'witness-card';
-  card.textContent = identity;
+  applyIdentityCardFace(card, identity, { face:true });
   card.style.transform = `translate(-50%,-50%) scale(1.08)`;
   card.style.zIndex = '10';
   witnessHandEl.appendChild(card);
@@ -4556,6 +4587,9 @@ function renderMyHand(){
   const myId = state.userId;
   const handData = state.hands[myId];
   const cards = Array.isArray(handData?.cards) ? handData.cards : [];
+  const myIdentity = handData?.identity || '';
+  const canPlayCardOne = myIdentity === 'L';
+  const isPlayPhase = !!state.isPlayable;
 
   const sig = JSON.stringify(cards);
 
@@ -4595,6 +4629,11 @@ function renderMyHand(){
     applyCardFace(card, v);
     card.dataset.index = String(i);
     card.dataset.cardId = String(v);
+    const cardValue = String(v);
+    const isCardZero = cardValue === '0';
+    const isCardOne = cardValue === '1';
+    const shouldDisablePlay = isPlayPhase && (isCardZero || (isCardOne && !canPlayCardOne));
+    if (shouldDisablePlay) card.classList.add('no-play');
 
     if (shouldMarkNewLast && i === cards.length - 1){
       card.classList.add('new-in');
@@ -4632,10 +4671,12 @@ function renderMyHand(){
       });
     }
 
-    card.addEventListener('pointerdown', onCardPointerDown);
-    card.addEventListener('pointermove', onCardPointerMove);
-    card.addEventListener('pointerup', onCardPointerUp);
-    card.addEventListener('pointercancel', onCardPointerUp);
+    if (!shouldDisablePlay){
+      card.addEventListener('pointerdown', onCardPointerDown);
+      card.addEventListener('pointermove', onCardPointerMove);
+      card.addEventListener('pointerup', onCardPointerUp);
+      card.addEventListener('pointercancel', onCardPointerCancel);
+    }
 
     myHandEl.appendChild(card);
   });
@@ -4968,6 +5009,7 @@ async function animateDiscardFlyer(entry){
 
 function animateDiscardEntries(entries){
   entries.forEach((entry, idx) => {
+    if (entry?.by === state.userId && entry?.reason === 'play') return;
     setTimeout(() => {
       animateDiscardFlyer(entry).catch(console.warn);
     }, idx * 180);
@@ -5667,13 +5709,13 @@ function renderPlayerCircle(players){
       if (aliasIdx >= 0) aliasRevealIdx = aliasIdx;
     }
 
-    if (eliminated && eliminatedDiscardedAt){
-      const idSlide = document.createElement('div');
-      idSlide.className = 'eliminated-identity-card';
-      idSlide.textContent = eliminatedIdentity;
-      const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
-      if (Number.isFinite(elapsed) && elapsed >= 200){
-        idSlide.classList.add('settled');
+  if (eliminated && eliminatedDiscardedAt){
+    const idSlide = document.createElement('div');
+    idSlide.className = 'eliminated-identity-card';
+    applyIdentityCardFace(idSlide, eliminatedIdentity, { face:true });
+    const elapsed = Date.now() - Number(eliminatedDiscardedAt || 0);
+    if (Number.isFinite(elapsed) && elapsed >= 200){
+      idSlide.classList.add('settled');
       } else if (Number.isFinite(elapsed)){
         idSlide.style.animationDelay = `${Math.max(0, 200 - elapsed)}ms`;
       }
@@ -5697,12 +5739,12 @@ function renderPlayerCircle(players){
         miniHand.appendChild(arrestCard);
       }
 
-      if (eliminated && !eliminatedDiscardedAt){
-        const idFace = document.createElement('div');
-        idFace.className = 'judgement-id-face';
-        idFace.textContent = eliminatedIdentity;
-        miniHand.appendChild(idFace);
-      }
+    if (eliminated && !eliminatedDiscardedAt){
+      const idFace = document.createElement('div');
+      idFace.className = 'judgement-id-face';
+      applyIdentityCardFace(idFace, eliminatedIdentity, { face:true });
+      miniHand.appendChild(idFace);
+    }
 
       // ★ 5：使用者だけ、左に正体カード裏を置く（mini-handの中に置く）
       if (iAmWitnessBy){
@@ -5818,7 +5860,7 @@ function renderPlayerCircle(players){
         miniHand.appendChild(miniCircle);
         const idFace = document.createElement('div');
         idFace.className = 'judgement-id-face';
-        idFace.textContent = eliminatedIdentity;
+        applyIdentityCardFace(idFace, eliminatedIdentity, { face:true });
         miniHand.appendChild(idFace);
         tag.appendChild(miniHand);
       } else if (iAmGun2By && p.id !== state.userId){
