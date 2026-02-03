@@ -3399,7 +3399,7 @@ function syncJudgementUI(){
     const startedAt = Number(j.countdownStartedAt || j.at || Date.now());
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(0, 3 - Math.floor(elapsed / 1000));
-    const shouldShowCountdown = isActiveKira && j.kiraHasZero && j.countdownMode === 'postWrite';
+    const shouldShowCountdown = j.countdownMode === 'postWrite' ? isActiveKira : true;
     if (remaining > 0){
       showJudgementMessage(shouldShowCountdown, `${remaining}..`);
       if (judgementCountdownTimer){
@@ -3547,13 +3547,13 @@ async function startJudgementSequence(players, round){
     const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
     await set(jRef, {
       active: true,
-      phase: kiraHasZero ? 'select' : 'noZero',
+      phase: 'countdown',
       kiraId,
       kiraHasZero,
       targetId: null,
-      countdownStartedAt: null,
-      countdownMode: null,
-      noZeroAt: kiraHasZero ? null : Date.now(),
+      countdownStartedAt: Date.now(),
+      countdownMode: 'initial',
+      noZeroAt: null,
       at: Date.now(),
       showNote: false
     });
