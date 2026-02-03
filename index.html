@@ -226,6 +226,20 @@
     font-weight:900;font-size:16px;color:#fff;
   }
 
+  /* ★ 0/1/1：1を山札へ戻す演出 */
+  .reveal011-flyer{
+    position:fixed;
+    width:60px;height:90px;border-radius:8px;
+    border:1px solid rgba(0,0,0,.18);
+    background:#111;
+    display:flex;align-items:stretch;justify-content:stretch;
+    box-shadow:0 18px 40px rgba(0,0,0,.28);
+    pointer-events:none;
+    z-index:96;
+    transform:translate(-50%,-50%);
+    opacity:1;
+  }
+
   @keyframes deckShake{
     0%{transform:translate(-50%,-50%) rotate(0deg);}
     25%{transform:translate(-50%,-50%) rotate(-6deg);}
@@ -281,6 +295,11 @@
   }
   .player-tag.turn-hand .mini-hand{
     animation: otherTurnHandPulse 900ms ease-in-out infinite;
+  }
+
+  /* ★ 0/1/1：手札全公開中（mini-hand拡大） */
+  .player-tag.reveal011-hand .mini-hand{
+    transform:translate(-50%,3px) scale(1.4);
   }
 
   /* =========================================================
@@ -649,6 +668,28 @@
   }
   .shinigami-close-pop.hidden{ display:none; }
   .shinigami-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+
+  /* ★ 0/1/1：公開＋交換ポップ */
+  .reveal011-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:10px 12px;
+    z-index:86;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:320px;
+    justify-content:space-between;
+  }
+  .reveal011-pop.hidden{ display:none; }
+  .reveal011-pop .msg{ font-weight:900; font-size:13px; }
 
   .gun2-confirm-pop{
     position:fixed;
@@ -1457,6 +1498,12 @@
   <button id="btnShinigamiCloseYes" class="btn primary">はい</button>
 </div>
 
+<!-- ★ 0/1/1：公開＋交換ポップ -->
+<div id="reveal011Pop" class="reveal011-pop hidden" aria-hidden="true">
+  <div class="msg">Reveal your entire hand to everyone, and exchange only one of your 1 cards with a card from the deck. Yes.</div>
+  <button id="btnReveal011Yes" class="btn primary">Yes</button>
+</div>
+
 <!-- ★ 2：使用確認ポップ（使用者だけ） -->
 <div id="gun2ConfirmPop" class="gun2-confirm-pop hidden" aria-hidden="true">
   <div class="msg">2を使用しますか？</div>
@@ -1613,6 +1660,8 @@ const RESHUFFLE_ANIM_MS = 980;
 const TRANSFER_ANIM_MS = 620;
 const EXCHANGE_ANIM_MS = 620;
 const EXCHANGE_WAIT_BEFORE_MOVE_MS = 1000;
+const REVEAL011_MOVE_MS = 520;
+const REVEAL011_SHUFFLE_MS = 560;
 
 /* ★ 6（監視） */
 const WATCH6_MAX_AGE_MS = 60000;
@@ -1644,6 +1693,7 @@ const state = {
   alias3Event: null,   // ★ 3（偽名）イベント
   arrest1: null,       // ★ 1（逮捕）
   arrest1Meta: null,   // ★ 1（逮捕）メタ
+  reveal011: null,     // ★ 0/1/1 公開＋交換
   eliminated: {},      // ★ 脱落
 };
 
@@ -1719,6 +1769,10 @@ const btnWitnessCloseYes = document.getElementById('btnWitnessCloseYes');
 /* ★ 13（死神）閉じる確認 */
 const shinigamiClosePop = document.getElementById('shinigamiClosePop');
 const btnShinigamiCloseYes = document.getElementById('btnShinigamiCloseYes');
+
+/* ★ 0/1/1：公開＋交換 */
+const reveal011Pop = document.getElementById('reveal011Pop');
+const btnReveal011Yes = document.getElementById('btnReveal011Yes');
 
 /* ★ 2（拳銃）使用確認 */
 const gun2ConfirmPop = document.getElementById('gun2ConfirmPop');
@@ -1845,6 +1899,8 @@ let lastExchangeEventId = null;
 let lastDiscardCount = 0;
 let discardLoaded = false;
 let lastArrestEventId = null;
+let lastReveal011MoveEventId = null;
+let lastDeckShuffleEventId = null;
 
 let localPicked = null;
 let localExchangePicked = null;
@@ -1949,6 +2005,15 @@ function myHandHasCard(cardId){
   if (!Array.isArray(cards)) return false;
   return cards.includes(String(cardId));
 }
+function isZeroOneOneHand(cards){
+  if (!Array.isArray(cards) || cards.length !== 3) return false;
+  const counts = cards.reduce((acc, v) => {
+    const key = String(v);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  return counts['0'] === 1 && counts['1'] === 2;
+}
 function isJudgementActive(){ return !!state.judgement?.active; }
 function getJudgement(){ return (state.judgement && typeof state.judgement === 'object') ? state.judgement : null; }
 function isEliminated(playerId){ return !!state.eliminated?.[playerId]; }
@@ -1984,8 +2049,9 @@ function calcIsPlayable(){
   const gActive   = isGun2Active();
   const jActive   = isJudgementActive();
   const aActive   = isArrestActive();
+  const rActive   = !!state.reveal011?.active;
 
-  return isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && (count === 3);
+  return isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && !rActive && (count === 3);
 }
 
 /* =========================
@@ -2466,6 +2532,8 @@ function updateTurnUI(){
   syncWitnessCenterOverlay();
   // ★ 13：キラだけ閉じる
   syncShinigamiClosePop();
+  // ★ 0/1/1：公開＋交換
+  syncReveal011Pop();
   // ★ 2：使用確認
   syncGun2ConfirmPop();
   // ★ 1：Are you Kira?
@@ -2594,6 +2662,38 @@ function subscribeReshuffleEvent(){
 
     const count = Number(ev.count || 0);
     animateReshuffleDiscardToDeck(count);
+  });
+}
+
+function subscribeReveal011MoveEvent(){
+  const evRef = ref(db, `rooms/${state.roomCode}/reveal011MoveEvent`);
+  onValue(evRef, snap => {
+    const ev = snap.val();
+    if (!ev || !ev.id) return;
+    if (ev.id === lastReveal011MoveEventId) return;
+    lastReveal011MoveEventId = ev.id;
+
+    const now = Date.now();
+    if (ev.at && (now - ev.at) > 8000) return;
+
+    const pid = ev.playerId;
+    if (!pid) return;
+    animateReveal011MoveToDeck(pid);
+  });
+}
+
+function subscribeDeckShuffleEvent(){
+  const evRef = ref(db, `rooms/${state.roomCode}/deckShuffleEvent`);
+  onValue(evRef, snap => {
+    const ev = snap.val();
+    if (!ev || !ev.id) return;
+    if (ev.id === lastDeckShuffleEventId) return;
+    lastDeckShuffleEventId = ev.id;
+
+    const now = Date.now();
+    if (ev.at && (now - ev.at) > 8000) return;
+
+    animateDeckShuffle();
   });
 }
 
@@ -2755,6 +2855,16 @@ function subscribeShinigami13(){
   onValue(sRef, snap => {
     const s = snap.val() || null;
     state.shinigami13 = (s && typeof s === 'object') ? s : null;
+    updateTurnUI();
+    renderPlayerCircle(latestPlayers);
+  });
+}
+
+function subscribeReveal011(){
+  const rRef = ref(db, `rooms/${state.roomCode}/reveal011`);
+  onValue(rRef, snap => {
+    const r = snap.val() || null;
+    state.reveal011 = (r && typeof r === 'object') ? r : null;
     updateTurnUI();
     renderPlayerCircle(latestPlayers);
   });
@@ -3741,6 +3851,85 @@ btnShinigamiCloseYes.addEventListener('click', async (e) => {
   if (shinigamiClosePop.classList.contains('hidden')) return;
   await finishShinigami13();
 });
+
+/* =========================
+   ★ 0/1/1：公開＋交換ポップ
+   ========================= */
+function syncReveal011Pop(){
+  if (!reveal011Pop) return;
+  const myCards = state.hands?.[state.userId]?.cards;
+  const shouldShow = isZeroOneOneHand(myCards) && !isEliminated(state.userId) && !state.reveal011?.active;
+  reveal011Pop.classList.toggle('hidden', !shouldShow);
+  reveal011Pop.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+
+  const canUse = shouldShow && state.isPlayable && !state.turn?.paused;
+  if (btnReveal011Yes){
+    btnReveal011Yes.disabled = !canUse;
+    btnReveal011Yes.classList.toggle('disabled', !canUse);
+  }
+}
+
+btnReveal011Yes?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (reveal011Pop.classList.contains('hidden')) return;
+  await startReveal011Exchange();
+});
+
+async function startReveal011Exchange(){
+  if (!state.roomCode) return;
+  if (state.reveal011?.active) return;
+  const myCards = state.hands?.[state.userId]?.cards;
+  if (!isZeroOneOneHand(myCards)) return;
+  if (!state.isPlayable) return;
+
+  const lockRef = ref(db, `rooms/${state.roomCode}/reveal011Lock`);
+  const myId = state.userId;
+  const locked = await runTransaction(lockRef, (cur) => {
+    if (cur && cur.by && cur.at && (Date.now() - cur.at) < 15000) return;
+    return { by: myId, at: Date.now() };
+  }, { applyLocally:false });
+
+  if (!locked.committed) return;
+
+  try{
+    await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+    await set(ref(db, `rooms/${state.roomCode}/reveal011`), {
+      active: true,
+      by: myId,
+      phase: 'reveal',
+      at: Date.now()
+    });
+
+    await sleep(240);
+    await emitReveal011MoveEvent(myId);
+    await sleep(REVEAL011_MOVE_MS);
+
+    await removeOneCardFromHandAtomic(myId, '1');
+    await addCardToDeckAtomic('1');
+
+    let drawn = await drawOneFromDeckAtomic();
+    if (!drawn){
+      await reshuffleFromDiscardAndPauseTurn(myId, state.turn.turnSeq);
+      await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+      drawn = await drawOneFromDeckAtomic();
+    }
+
+    if (drawn){
+      await emitDrawEvent(myId, state.turn.turnSeq, 'reveal011');
+      await sleep(DRAW_COMMIT_DELAY_MS);
+      await addCardToHandAtomic(myId, drawn);
+    }
+
+    await shuffleDeckAtomic();
+    await emitDeckShuffleEvent();
+    await sleep(REVEAL011_SHUFFLE_MS);
+
+    await set(ref(db, `rooms/${state.roomCode}/reveal011`), null);
+    await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
+  } finally {
+    await set(lockRef, null);
+  }
+}
 
 /* =========================
    ★ 2：使用確認ポップ
@@ -4809,12 +4998,43 @@ async function drawOneFromDeckAtomic(){
   return picked;
 }
 
+async function addCardToDeckAtomic(cardValue){
+  if (!state.roomCode) return;
+  const deckRef = ref(db, `rooms/${state.roomCode}/deck`);
+  await runTransaction(deckRef, (deck) => {
+    const arr = Array.isArray(deck) ? [...deck] : [];
+    arr.push(String(cardValue));
+    return arr;
+  }, { applyLocally:false });
+}
+
+async function shuffleDeckAtomic(){
+  if (!state.roomCode) return;
+  const deckRef = ref(db, `rooms/${state.roomCode}/deck`);
+  await runTransaction(deckRef, (deck) => {
+    const arr = Array.isArray(deck) ? [...deck] : [];
+    shuffleInPlace(arr);
+    return arr;
+  }, { applyLocally:false });
+}
+
 async function addCardToHandAtomic(playerId, cardValue){
   if (!state.roomCode) return;
   const cardsRef = ref(db, `rooms/${state.roomCode}/hands/${playerId}/cards`);
   await runTransaction(cardsRef, (cards) => {
     const arr = Array.isArray(cards) ? [...cards] : [];
     arr.push(cardValue);
+    return arr;
+  }, { applyLocally:false });
+}
+
+async function removeOneCardFromHandAtomic(playerId, cardValue){
+  if (!state.roomCode) return;
+  const cardsRef = ref(db, `rooms/${state.roomCode}/hands/${playerId}/cards`);
+  await runTransaction(cardsRef, (cards) => {
+    const arr = Array.isArray(cards) ? [...cards] : [];
+    const idx = arr.indexOf(String(cardValue));
+    if (idx >= 0) arr.splice(idx, 1);
     return arr;
   }, { applyLocally:false });
 }
@@ -4829,6 +5049,25 @@ async function emitDrawEvent(playerId, seq, kind){
     playerId,
     seq: Number(seq || 0),
     kind: kind || 'turn',
+    at: Date.now()
+  });
+}
+
+async function emitReveal011MoveEvent(playerId){
+  if (!state.roomCode) return;
+  const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  await set(ref(db, `rooms/${state.roomCode}/reveal011MoveEvent`), {
+    id,
+    playerId,
+    at: Date.now()
+  });
+}
+
+async function emitDeckShuffleEvent(){
+  if (!state.roomCode) return;
+  const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  await set(ref(db, `rooms/${state.roomCode}/deckShuffleEvent`), {
+    id,
     at: Date.now()
   });
 }
@@ -5224,6 +5463,42 @@ async function animateExchangeMove(ev){
   f.remove();
 }
 
+/* ★ 0/1/1：1を山札へ戻す演出（全員） */
+async function animateReveal011MoveToDeck(playerId){
+  if (!deckPile) return;
+  const from = getFromPointForPlayer(playerId);
+  const dr = deckPile.getBoundingClientRect();
+  const to = { x: dr.left + dr.width/2, y: dr.top + dr.height/2 };
+
+  const flyer = document.createElement('div');
+  flyer.className = 'reveal011-flyer';
+  applyCardFace(flyer, '1', { size: 'mini' });
+  flyer.style.left = `${from.x}px`;
+  flyer.style.top = `${from.y}px`;
+  flyer.style.transform = 'translate(-50%,-50%) rotate(-6deg) scale(1)';
+  document.body.appendChild(flyer);
+
+  await sleep(20);
+  flyer.style.transition = 'left 420ms ease, top 420ms ease, transform 420ms ease, opacity 160ms ease';
+  flyer.style.left = `${to.x}px`;
+  flyer.style.top = `${to.y}px`;
+  flyer.style.transform = 'translate(-50%,-50%) rotate(10deg) scale(0.7)';
+
+  await sleep(REVEAL011_MOVE_MS);
+  flyer.style.opacity = '0';
+  flyer.style.transform += ' scale(0.92)';
+  await sleep(160);
+  flyer.remove();
+}
+
+/* ★ 0/1/1：デッキシャッフル演出（全員） */
+async function animateDeckShuffle(){
+  if (!deckPile) return;
+  deckPile.classList.add('shuffling');
+  await sleep(REVEAL011_SHUFFLE_MS);
+  deckPile.classList.remove('shuffling');
+}
+
 /* =========================
    カード使用 → 捨て札に追加 → 次の手番
    ========================= */
@@ -5420,6 +5695,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeTurn();
   subscribeDrawEvent();
   subscribeReshuffleEvent();
+  subscribeReveal011MoveEvent();
+  subscribeDeckShuffleEvent();
   subscribeAlias3Event();
 
   subscribeInvestigation();
@@ -5436,6 +5713,8 @@ btnJoin.addEventListener('click', async () => {
   subscribeVote7();
   // ★ 13（死神）
   subscribeShinigami13();
+  // ★ 0/1/1（公開＋交換）
+  subscribeReveal011();
   // ★ 2（拳銃）
   subscribeGun2();
   // ★ 1（逮捕）
@@ -5625,6 +5904,8 @@ function renderPlayerCircle(players){
   const arrest = getArrest1();
   const arrestActive = !!arrest?.active;
   const isArrestByMe = arrestActive && arrest.phase === 'pickTarget' && arrest.by === state.userId;
+  const reveal011 = state.reveal011;
+  const reveal011TargetId = (reveal011?.active && reveal011?.by) ? reveal011.by : null;
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
@@ -5642,6 +5923,10 @@ function renderPlayerCircle(players){
     nameSpan.className = 'player-name';
     nameSpan.textContent = p.name;
     tag.appendChild(nameSpan);
+
+    if (reveal011TargetId && p.id === reveal011TargetId && p.id !== state.userId){
+      tag.classList.add('reveal011-hand');
+    }
 
     if (arrestActive && arrest?.targetId && arrest.targetId === p.id){
       tag.classList.add('arrest-selected');
@@ -5766,6 +6051,7 @@ function renderPlayerCircle(players){
     }
 
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
+      const reveal011Active = !!(reveal011TargetId && p.id === reveal011TargetId);
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
       const miniCircle = document.createElement('div');
@@ -5827,6 +6113,11 @@ function renderPlayerCircle(players){
         card.style.setProperty('--rot', `${angleDeg}deg`);
         card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg)`;
         card.style.zIndex = String(10 + idx2);
+
+        if (reveal011Active){
+          card.classList.add('reveal011-face');
+          applyCardFace(card, v, { size: 'mini' });
+        }
 
         if (showShinigamiReveal && Number.isFinite(Number(sh?.zeroIndex)) && idx2 === Number(sh.zeroIndex)){
           card.classList.add('shinigami-face');
@@ -6098,6 +6389,10 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/arrest1`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Meta`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Event`), null),
+    set(ref(db, `rooms/${state.roomCode}/reveal011`), null),
+    set(ref(db, `rooms/${state.roomCode}/reveal011MoveEvent`), null),
+    set(ref(db, `rooms/${state.roomCode}/deckShuffleEvent`), null),
+    set(ref(db, `rooms/${state.roomCode}/reveal011Lock`), null),
   ]);
 
   if (initialDrawDisp){
@@ -6148,6 +6443,10 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/arrest1`)),
     remove(ref(db, `${base}/arrest1Meta`)),
     remove(ref(db, `${base}/arrest1Event`)),
+    remove(ref(db, `${base}/reveal011`)),
+    remove(ref(db, `${base}/reveal011MoveEvent`)),
+    remove(ref(db, `${base}/deckShuffleEvent`)),
+    remove(ref(db, `${base}/reveal011Lock`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
