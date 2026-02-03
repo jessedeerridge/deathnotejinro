@@ -1045,6 +1045,9 @@
     outline:3px solid #111;
     outline-offset:1px;
   }
+  .my-card.dragging{
+    opacity:0;
+  }
 
   .dialog-backdrop{
     position:fixed;inset:0;background:rgba(0,0,0,.35);
@@ -2846,15 +2849,17 @@ function renderDiscardCenter(){
 }
 
 /* ====== ドラッグ ====== */
-let drag = { active:false, cardIndex:null, pointerId:null, ghostEl:null, overCenter:false };
+let drag = { active:false, cardIndex:null, pointerId:null, ghostEl:null, overCenter:false, sourceEl:null };
 
 function cleanupDrag(){
   if (drag.ghostEl) drag.ghostEl.remove();
+  if (drag.sourceEl) drag.sourceEl.classList.remove('dragging');
   drag.active = false;
   drag.cardIndex = null;
   drag.pointerId = null;
   drag.ghostEl = null;
   drag.overCenter = false;
+  drag.sourceEl = null;
   centerArea.classList.remove('active-drop');
 }
 function isPointInRect(x, y, rect){ return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom; }
@@ -2869,6 +2874,8 @@ function onCardPointerDown(e){
   drag.active = true;
   drag.cardIndex = idx;
   drag.pointerId = e.pointerId;
+  drag.sourceEl = cardEl;
+  cardEl.classList.add('dragging');
 
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
@@ -2906,6 +2913,12 @@ async function onCardPointerUp(e){
   cleanupDrag();
 
   if (shouldPlay) await playCardFromHand(idx);
+  try { cardEl.releasePointerCapture(e.pointerId); } catch {}
+}
+function onCardPointerCancel(e){
+  const cardEl = e.currentTarget;
+  if (!drag.active || drag.pointerId !== e.pointerId) return;
+  cleanupDrag();
   try { cardEl.releasePointerCapture(e.pointerId); } catch {}
 }
 
@@ -4635,7 +4648,7 @@ function renderMyHand(){
     card.addEventListener('pointerdown', onCardPointerDown);
     card.addEventListener('pointermove', onCardPointerMove);
     card.addEventListener('pointerup', onCardPointerUp);
-    card.addEventListener('pointercancel', onCardPointerUp);
+    card.addEventListener('pointercancel', onCardPointerCancel);
 
     myHandEl.appendChild(card);
   });
@@ -4968,6 +4981,7 @@ async function animateDiscardFlyer(entry){
 
 function animateDiscardEntries(entries){
   entries.forEach((entry, idx) => {
+    if (entry?.by === state.userId && entry?.reason === 'play') return;
     setTimeout(() => {
       animateDiscardFlyer(entry).catch(console.warn);
     }, idx * 180);
