@@ -3016,10 +3016,12 @@ async function maybeResolveInvestigation(){
 
   const players = await getSeatedPlayers();
   if (!players.length) return;
+  const activePlayers = players.filter(p => !isEliminated(p.id));
+  if (!activePlayers.length) return;
 
   const selections = inv.selections || {};
-  const pickedCount = players.filter(p => selections[p.id] && Number.isFinite(Number(selections[p.id].idx))).length;
-  if (pickedCount !== players.length) return;
+  const pickedCount = activePlayers.filter(p => selections[p.id] && Number.isFinite(Number(selections[p.id].idx))).length;
+  if (pickedCount !== activePlayers.length) return;
 
   const lockRef = ref(db, `rooms/${state.roomCode}/investigation/resolveLock`);
   const myId = state.userId;
@@ -3036,7 +3038,7 @@ async function maybeResolveInvestigation(){
     const hands = handsSnap.val() || {};
 
     const dir = inv.dir;
-    const order = players.map(p => p.id);
+    const order = activePlayers.map(p => p.id);
 
     function prevId(pid){
       const i = order.indexOf(pid);
