@@ -2005,6 +2005,13 @@ function myHandHasCard(cardId){
   if (!Array.isArray(cards)) return false;
   return cards.includes(String(cardId));
 }
+function getReveal011HideIndex(playerId){
+  const r = state.reveal011;
+  if (!r?.active || r.by !== playerId) return null;
+  const idx = Number(r.hideIndex);
+  if (!Number.isFinite(idx) || idx < 0) return null;
+  return idx;
+}
 function isZeroOneOneHand(cards){
   if (!Array.isArray(cards) || cards.length !== 3) return false;
   const counts = cards.reduce((acc, v) => {
@@ -3880,6 +3887,8 @@ async function startReveal011Exchange(){
   if (state.reveal011?.active) return;
   const myCards = state.hands?.[state.userId]?.cards;
   if (!isZeroOneOneHand(myCards)) return;
+  const hideIndex = Array.isArray(myCards) ? myCards.indexOf('1') : -1;
+  if (hideIndex < 0) return;
   if (!state.isPlayable) return;
 
   const lockRef = ref(db, `rooms/${state.roomCode}/reveal011Lock`);
@@ -3896,7 +3905,8 @@ async function startReveal011Exchange(){
     await set(ref(db, `rooms/${state.roomCode}/reveal011`), {
       active: true,
       by: myId,
-      phase: 'reveal',
+      phase: 'moving',
+      hideIndex,
       at: Date.now()
     });
 
@@ -3906,6 +3916,11 @@ async function startReveal011Exchange(){
 
     await removeOneCardFromHandAtomic(myId, '1');
     await addCardToDeckAtomic('1');
+    await update(ref(db, `rooms/${state.roomCode}/reveal011`), {
+      phase: 'drawing',
+      hideIndex: null,
+      updatedAt: Date.now()
+    });
 
     let drawn = await drawOneFromDeckAtomic();
     if (!drawn){
@@ -4824,6 +4839,7 @@ function renderMyHand(){
   const myId = state.userId;
   const handData = state.hands[myId];
   const cards = Array.isArray(handData?.cards) ? handData.cards : [];
+  const hideIdx = getReveal011HideIndex(myId);
 
   const sig = JSON.stringify(cards);
 
@@ -4862,7 +4878,11 @@ function renderMyHand(){
 
   myHandEl.innerHTML = '';
 
-  cards.forEach((v, i) => {
+  const visible = cards
+    .map((v, i) => ({ v, i }))
+    .filter(({ i }) => i !== hideIdx);
+
+  visible.forEach(({ v, i }) => {
     const card = document.createElement('div');
     card.className = 'my-card';
     applyCardFace(card, v);
@@ -6052,6 +6072,7 @@ function renderPlayerCircle(players){
 
     if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
       const reveal011Active = !!(reveal011TargetId && p.id === reveal011TargetId);
+      const hideIdx = reveal011Active ? getReveal011HideIndex(p.id) : null;
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
       const miniCircle = document.createElement('div');
@@ -6102,17 +6123,20 @@ function renderPlayerCircle(players){
         }
       }
 
-      const count = handData.cards.length;
+      const visibleCards = handData.cards
+        .map((v, idx2) => ({ v, idx2 }))
+        .filter(({ idx2 }) => idx2 !== hideIdx);
+      const count = visibleCards.length;
       const spread = 70;
       const base = (count > 1) ? (-spread/2) : 0;
 
-      handData.cards.forEach((v, idx2) => {
+      visibleCards.forEach(({ v, idx2 }, viewIdx) => {
         const card = document.createElement('div');
         card.className = 'mini-card';
-        const angleDeg = (count > 1) ? base + (spread/(count-1))*idx2 : 0;
+        const angleDeg = (count > 1) ? base + (spread/(count-1))*viewIdx : 0;
         card.style.setProperty('--rot', `${angleDeg}deg`);
         card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg)`;
-        card.style.zIndex = String(10 + idx2);
+        card.style.zIndex = String(10 + viewIdx);
 
         if (reveal011Active){
           card.classList.add('reveal011-face');
