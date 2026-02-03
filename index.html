@@ -1003,6 +1003,10 @@
     cursor:grab;
   }
   .my-hand.is-playable .my-card:active{ cursor:grabbing; }
+  .my-hand.is-playable .my-card.play-disabled{
+    animation:none;
+    cursor:default;
+  }
 
   /* ★ 8：交換で「返すカードを選ぶ」 */
   .my-hand.exchange-pick .my-card{
@@ -1017,6 +1021,7 @@
   }
   .my-card.new-in{ animation: slideInRight 220ms ease both; }
   .my-hand.is-playable .my-card.new-in{ animation: slideInRight 220ms ease both, myPulse 900ms ease-in-out infinite; }
+  .my-hand.is-playable .my-card.play-disabled.new-in{ animation: slideInRight 220ms ease both; }
   .my-hand.exchange-pick .my-card.new-in{ animation: slideInRight 220ms ease both, myPulse 900ms ease-in-out infinite; }
 
   .drag-ghost{
@@ -1952,6 +1957,7 @@ function calcIsPlayable(){
   const myId = state.userId;
   const hand = state.hands[myId];
   const count = Array.isArray(hand?.cards) ? hand.cards.length : 0;
+  const isMyTurn = !!state.turn.currentPlayerId && (state.turn.currentPlayerId === myId);
   if (isEliminated(myId)) return false;
 
   const invActive = isInvestigationActive();
@@ -1964,7 +1970,7 @@ function calcIsPlayable(){
   const jActive   = isJudgementActive();
   const aActive   = isArrestActive();
 
-  return state.isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && (count === 3);
+  return isMyTurn && !state.turn.paused && !invActive && !exActive && !wActive && !wiActive && !vActive && !sActive && !gActive && !jActive && !aActive && (count === 3);
 }
 
 /* =========================
@@ -2891,6 +2897,7 @@ function isPointInRect(x, y, rect){ return x >= rect.left && x <= rect.right && 
 function onCardPointerDown(e){
   const cardEl = e.currentTarget;
   if (!state.isPlayable) return;
+  if (cardEl.dataset.playDisabled === 'true') return;
 
   const idx = Number(cardEl.dataset.index);
   if (!Number.isFinite(idx)) return;
@@ -4593,6 +4600,8 @@ function renderMyHand(){
   const myId = state.userId;
   const handData = state.hands[myId];
   const cards = Array.isArray(handData?.cards) ? handData.cards : [];
+  const isPlayPhase = calcIsPlayable();
+  const isL = getMyIdentity() === 'L';
 
   const sig = JSON.stringify(cards);
 
@@ -4632,6 +4641,13 @@ function renderMyHand(){
     applyCardFace(card, v);
     card.dataset.index = String(i);
     card.dataset.cardId = String(v);
+    const isPlayRestricted = isPlayPhase && (v === '0' || (v === '1' && !isL));
+    if (isPlayRestricted){
+      card.classList.add('play-disabled');
+      card.dataset.playDisabled = 'true';
+    } else {
+      card.dataset.playDisabled = 'false';
+    }
 
     if (shouldMarkNewLast && i === cards.length - 1){
       card.classList.add('new-in');
