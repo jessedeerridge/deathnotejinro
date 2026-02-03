@@ -652,7 +652,7 @@
     position:fixed;
     top:50%;
     left:-320px;
-    transform:translateY(-50%);
+    transform:translate(-50%,-50%);
     background:rgba(20,20,20,.92);
     color:#fff;
     border:1px solid rgba(255,255,255,.12);
@@ -786,7 +786,7 @@
   .judgement-notebook.hidden{ display:none; }
   .judgement-notebook.open{
     width:260px;
-    transform:translate(calc(-50% + 20px), -50%);
+    transform:translate(-50%, -50%);
   }
   .judgement-page{
     width:120px;
@@ -807,6 +807,7 @@
     position:absolute;
     inset:0;
     cursor:crosshair;
+    touch-action:none;
   }
 
   .judgement-confirm-pop{
@@ -3393,11 +3394,14 @@ function syncJudgementUI(){
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
+    judgementNotebook?.classList.add('hidden');
+    judgementNotebook?.classList.remove('open');
     const startedAt = Number(j.countdownStartedAt || j.at || Date.now());
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(0, 3 - Math.floor(elapsed / 1000));
+    const shouldShowCountdown = isActiveKira && j.kiraHasZero && j.countdownMode === 'postWrite';
     if (remaining > 0){
-      showJudgementMessage(true, `${remaining}..`);
+      showJudgementMessage(shouldShowCountdown, `${remaining}..`);
       if (judgementCountdownTimer){
         clearTimeout(judgementCountdownTimer);
       }
@@ -3543,11 +3547,13 @@ async function startJudgementSequence(players, round){
     const jRef = ref(db, `rooms/${state.roomCode}/judgement`);
     await set(jRef, {
       active: true,
-      phase: 'countdown',
+      phase: kiraHasZero ? 'select' : 'noZero',
       kiraId,
       kiraHasZero,
       targetId: null,
-      countdownStartedAt: Date.now(),
+      countdownStartedAt: null,
+      countdownMode: null,
+      noZeroAt: kiraHasZero ? null : Date.now(),
       at: Date.now(),
       showNote: false
     });
@@ -3567,6 +3573,15 @@ async function advanceJudgementAfterCountdown(){
     const jSnap = await get(ref(db, `rooms/${state.roomCode}/judgement`));
     const latest = jSnap.val();
     if (!latest?.active || latest.phase !== 'countdown') return;
+    if (latest.countdownMode === 'postWrite'){
+      await update(ref(db, `rooms/${state.roomCode}/judgement`), {
+        phase: 'reveal',
+        showNote: true,
+        revealedAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      return;
+    }
     const nextPhase = latest.kiraHasZero ? 'select' : 'noZero';
     await update(ref(db, `rooms/${state.roomCode}/judgement`), {
       phase: nextPhase,
@@ -3699,14 +3714,16 @@ btnJudgementWriteYes?.addEventListener('click', async (e) => {
   if (!j?.active || j.phase !== 'writing') return;
   if (j.kiraId !== state.userId) return;
   if (!judgementHasStroke) return;
-  const targetId = j.targetId;
   const noteImage = judgementCanvas ? judgementCanvas.toDataURL('image/png') : null;
 
   await update(ref(db, `rooms/${state.roomCode}/judgement`), {
-    phase:'reveal',
-    showNote:true,
+    phase:'countdown',
+    showNote:false,
     noteImage,
-    revealedAt: Date.now()
+    countdownStartedAt: Date.now(),
+    countdownMode: 'postWrite',
+    revealedAt: null,
+    updatedAt: Date.now()
   });
 });
 
@@ -3718,8 +3735,22 @@ function bindJudgementCanvas(){
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#111';
 
+  const getCanvasPoint = (e) => {
+    const rect = judgementCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+    return {
+      x: Math.max(0, Math.min(rect.width, x)),
+      y: Math.max(0, Math.min(rect.height, y))
+    };
+  };
+
   const startDraw = (e) => {
     if (!judgementDrawActive) return;
+    e.preventDefault();
+    const point = getCanvasPoint(e);
+    if (!point) return;
     judgementStrokeCount += 1;
     if (judgementStrokeCount >= 3){
       judgementHasStroke = true;
@@ -3727,22 +3758,43 @@ function bindJudgementCanvas(){
         showJudgementWritePop(true);
       }
     }
-    judgementLastPoint = { x: e.offsetX, y: e.offsetY };
+    judgementLastPoint = point;
+    if (judgementCanvas.setPointerCapture){
+      judgementCanvas.setPointerCapture(e.pointerId);
+    }
   };
+
   const draw = (e) => {
     if (!judgementDrawActive || !judgementLastPoint) return;
+    e.preventDefault();
+    const point = getCanvasPoint(e);
+    if (!point){
+      judgementLastPoint = null;
+      return;
+    }
     ctx.beginPath();
     ctx.moveTo(judgementLastPoint.x, judgementLastPoint.y);
-    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.lineTo(point.x, point.y);
     ctx.stroke();
-    judgementLastPoint = { x: e.offsetX, y: e.offsetY };
+    judgementLastPoint = point;
   };
-  const endDraw = () => { judgementLastPoint = null; };
 
-  judgementCanvas.addEventListener('pointerdown', startDraw);
-  judgementCanvas.addEventListener('pointermove', draw);
+  const endDraw = (e) => {
+    if (e?.pointerId !== undefined && judgementCanvas.releasePointerCapture){
+      try{
+        judgementCanvas.releasePointerCapture(e.pointerId);
+      } catch (err){
+        // ignore pointer capture release errors
+      }
+    }
+    judgementLastPoint = null;
+  };
+
+  judgementCanvas.addEventListener('pointerdown', startDraw, { passive:false });
+  judgementCanvas.addEventListener('pointermove', draw, { passive:false });
   judgementCanvas.addEventListener('pointerup', endDraw);
   judgementCanvas.addEventListener('pointerleave', endDraw);
+  judgementCanvas.addEventListener('pointercancel', endDraw);
 }
 
 bindJudgementCanvas();
