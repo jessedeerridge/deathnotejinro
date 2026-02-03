@@ -3919,6 +3919,11 @@ async function startReveal011Exchange(){
     await removeOneCardFromHandAtomic(myId, '1');
     await addCardToDeckAtomic('1');
 
+    await update(ref(db, `rooms/${state.roomCode}/reveal011`), {
+      phase: 'draw',
+      at: Date.now()
+    });
+
     let drawn = await drawOneFromDeckAtomic();
     if (!drawn){
       await reshuffleFromDiscardAndPauseTurn(myId, state.turn.turnSeq);
@@ -5917,7 +5922,9 @@ function renderPlayerCircle(players){
   const arrestActive = !!arrest?.active;
   const isArrestByMe = arrestActive && arrest.phase === 'pickTarget' && arrest.by === state.userId;
   const reveal011 = state.reveal011;
-  const reveal011TargetId = (reveal011?.active && reveal011?.by) ? reveal011.by : null;
+  const reveal011TargetId = (reveal011?.active && reveal011?.by && reveal011?.phase === 'reveal')
+    ? reveal011.by
+    : null;
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
