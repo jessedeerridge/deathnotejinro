@@ -593,34 +593,16 @@
   .witness-close-pop.hidden{ display:none; }
   .witness-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
-  /* ★ 3：偽名（裁き回避）表示 */
-  .alias-backdrop{
-    position:fixed;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    z-index:86;
-    pointer-events:none;
-  }
-  .alias-backdrop.hidden{ display:none; }
-  .alias-card{
-    width:140px;
-    height:210px;
-    border-radius:14px;
-    border:1px solid rgba(0,0,0,.22);
+  /* ★ 3：偽名（裁き回避） */
+  .mini-card.alias3-face{
     background:#111;
+    color:#fff;
     display:flex;
     align-items:stretch;
     justify-content:stretch;
-    box-shadow:0 18px 44px rgba(0,0,0,.24);
-    transform:scale(1.05);
-    animation: aliasPulse 1200ms ease-in-out infinite;
-  }
-  @keyframes aliasPulse{
-    0%{ transform:scale(1.02); }
-    50%{ transform:scale(1.08); }
-    100%{ transform:scale(1.02); }
+    font-weight:900;
+    font-size:12px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
   }
 
   /* ★ 13：死神（扇手札の1枚を表で0表示） */
@@ -1517,11 +1499,6 @@
   <button id="btnJudgementWriteYes" class="btn primary">はい</button>
 </div>
 
-<!-- ★ 3：偽名（裁き回避）表示 -->
-<div id="aliasBackdrop" class="alias-backdrop hidden" aria-hidden="true">
-  <div id="aliasCard" class="alias-card"></div>
-</div>
-
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
@@ -1650,6 +1627,7 @@ const state = {
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
   judgement: null,     // ★ 裁き
+  alias3Event: null,   // ★ 3（偽名）イベント
   arrest1: null,       // ★ 1（逮捕）
   arrest1Meta: null,   // ★ 1（逮捕）メタ
   eliminated: {},      // ★ 脱落
@@ -1753,8 +1731,6 @@ const judgementWritePop = document.getElementById('judgementWritePop');
 const judgementFadeHome = judgementFade?.parentElement || null;
 const judgementFadeNextSibling = judgementFade?.nextSibling || null;
 const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
-const aliasBackdrop = document.getElementById('aliasBackdrop');
-const aliasCard = document.getElementById('aliasCard');
 
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
@@ -2601,7 +2577,23 @@ function subscribeAlias3Event(){
     const now = Date.now();
     if (ev.at && (now - ev.at) > 8000) return;
 
-    showAliasReveal(String(ev.card ?? '3'));
+    state.alias3Event = ev;
+    renderHands();
+    const elapsed = Number(now - Number(ev.at || now));
+    const remaining = Math.max(0, ALIAS3_DISPLAY_MS - elapsed);
+    if (aliasRevealTimer){
+      clearTimeout(aliasRevealTimer);
+    }
+    if (remaining > 0){
+      aliasRevealTimer = setTimeout(() => {
+        aliasRevealTimer = null;
+        state.alias3Event = null;
+        renderHands();
+      }, remaining);
+    } else {
+      state.alias3Event = null;
+      renderHands();
+    }
   });
 }
 
@@ -3900,21 +3892,6 @@ function showJudgementWritePop(show){
   if (!judgementWritePop) return;
   judgementWritePop.classList.toggle('hidden', !show);
   judgementWritePop.setAttribute('aria-hidden', show ? 'false' : 'true');
-}
-
-function showAliasReveal(cardId){
-  if (!aliasBackdrop || !aliasCard) return;
-  applyCardFace(aliasCard, cardId);
-  aliasBackdrop.classList.remove('hidden');
-  aliasBackdrop.setAttribute('aria-hidden', 'false');
-  if (aliasRevealTimer){
-    clearTimeout(aliasRevealTimer);
-  }
-  aliasRevealTimer = setTimeout(() => {
-    aliasRevealTimer = null;
-    aliasBackdrop.classList.add('hidden');
-    aliasBackdrop.setAttribute('aria-hidden', 'true');
-  }, ALIAS3_DISPLAY_MS);
 }
 
 function openJudgementNotebook(enableDraw){
@@ -5665,6 +5642,7 @@ function renderPlayerCircle(players){
     const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
+    const showAliasReveal = !!(state.alias3Event && state.alias3Event.targetId === p.id);
     let gun2RevealIdx = null;
     let gun2RevealCard = null;
     if (showGun2Reveal){
@@ -5681,6 +5659,12 @@ function renderPlayerCircle(players){
           gun2RevealCard = pickCard;
         }
       }
+    }
+    let aliasRevealIdx = null;
+    if (showAliasReveal){
+      const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
+      const aliasIdx = handCards.indexOf('3');
+      if (aliasIdx >= 0) aliasRevealIdx = aliasIdx;
     }
 
     if (eliminated && eliminatedDiscardedAt){
@@ -5769,6 +5753,11 @@ function renderPlayerCircle(players){
           applyCardFace(card, gun2RevealCard ?? '', { size: 'mini' });
           card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.4)`;
           card.style.zIndex = String(40 + idx2);
+        } else if (showAliasReveal && Number.isFinite(Number(aliasRevealIdx)) && idx2 === Number(aliasRevealIdx)){
+          card.classList.add('alias3-face');
+          applyCardFace(card, '3', { size: 'mini' });
+          card.style.transform = `translate(-50%,0) rotate(${angleDeg}deg) scale(1.25)`;
+          card.style.zIndex = String(38 + idx2);
         }
 
         miniHand.appendChild(card);
