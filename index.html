@@ -686,6 +686,71 @@
   .arrest-pop.hidden{ display:none; }
   .arrest-pop .msg{ font-weight:900; font-size:14px; text-align:center; }
 
+  .arrest-overlay{
+    position:fixed;
+    inset:0;
+    display:grid;
+    place-items:center;
+    background:rgba(0,0,0,.45);
+    z-index:90;
+  }
+  .arrest-overlay.hidden{ display:none; }
+  .arrest-overlay .arrest-image{
+    width:min(68vw, 520px);
+    height:min(68vw, 520px);
+    max-width:520px;
+    max-height:520px;
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    filter:drop-shadow(0 18px 40px rgba(0,0,0,.35));
+  }
+  .arrest-overlay .arrest-image.no{ background-image:url('dnno.jpg'); }
+  .arrest-overlay .arrest-image.yes{ background-image:url('dnyes.jpg'); }
+  .arrest-yes-stack{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:18px;
+  }
+  .arrest-kira-card{
+    position:relative;
+    width:170px;
+    height:250px;
+  }
+  .arrest-kira-half{
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    border:2px solid rgba(0,0,0,.35);
+    background:#fff;
+    color:#111;
+    font-weight:900;
+    font-size:32px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 18px 40px rgba(0,0,0,.25);
+  }
+  .arrest-kira-half.left{
+    clip-path:polygon(0 0, 52% 0, 48% 100%, 0 100%);
+    animation: arrestBreakLeft 1200ms ease forwards;
+  }
+  .arrest-kira-half.right{
+    clip-path:polygon(52% 0, 100% 0, 100% 100%, 48% 100%);
+    animation: arrestBreakRight 1200ms ease forwards;
+  }
+  @keyframes arrestBreakLeft{
+    0%{ transform:translateX(0) rotate(0); opacity:1; }
+    60%{ transform:translateX(-18px) rotate(-6deg); opacity:1; }
+    100%{ transform:translateX(-46px) rotate(-14deg); opacity:0; }
+  }
+  @keyframes arrestBreakRight{
+    0%{ transform:translateX(0) rotate(0); opacity:1; }
+    60%{ transform:translateX(18px) rotate(6deg); opacity:1; }
+    100%{ transform:translateX(46px) rotate(14deg); opacity:0; }
+  }
+
   .judgement-pop{
     position:fixed;
     top:50%;
@@ -1382,6 +1447,20 @@
   </div>
 </div>
 
+<div id="arrestNoOverlay" class="arrest-overlay hidden" aria-hidden="true">
+  <div class="arrest-image no"></div>
+</div>
+
+<div id="arrestYesOverlay" class="arrest-overlay hidden" aria-hidden="true">
+  <div class="arrest-yes-stack">
+    <div class="arrest-kira-card">
+      <div class="arrest-kira-half left">キラ</div>
+      <div class="arrest-kira-half right">キラ</div>
+    </div>
+    <div class="arrest-image yes"></div>
+  </div>
+</div>
+
 <div id="judgementPop" class="judgement-pop hidden">裁きの時間</div>
 <div id="judgementFade" class="judgement-fade"></div>
 <div id="judgementMessage" class="judgement-message hidden" aria-hidden="true">
@@ -1619,6 +1698,8 @@ const btnGun2No = document.getElementById('btnGun2No');
 const arrestPop = document.getElementById('arrestPop');
 const btnArrestYes = document.getElementById('btnArrestYes');
 const btnArrestNo = document.getElementById('btnArrestNo');
+const arrestNoOverlay = document.getElementById('arrestNoOverlay');
+const arrestYesOverlay = document.getElementById('arrestYesOverlay');
 
 /* ★ 裁き */
 const judgementPop = document.getElementById('judgementPop');
@@ -1732,6 +1813,7 @@ let lastTransferEventId = null;
 let lastExchangeEventId = null;
 let lastDiscardCount = 0;
 let discardLoaded = false;
+let lastArrestEventId = null;
 
 let localPicked = null;
 let localExchangePicked = null;
@@ -2653,6 +2735,21 @@ function subscribeArrest1Meta(){
     const meta = snap.val() || null;
     state.arrest1Meta = (meta && typeof meta === 'object') ? meta : null;
     syncArrestPop();
+  });
+}
+
+function subscribeArrest1Event(){
+  const evRef = ref(db, `rooms/${state.roomCode}/arrest1Event`);
+  onValue(evRef, snap => {
+    const ev = snap.val();
+    if (!ev || !ev.id) return;
+    if (ev.id === lastArrestEventId) return;
+    lastArrestEventId = ev.id;
+    const now = Date.now();
+    if (ev.at && (now - ev.at) > 8000) return;
+    if (ev.type === 'yes' || ev.type === 'no'){
+      showArrestOverlay(ev.type);
+    }
   });
 }
 
@@ -3583,6 +3680,34 @@ function syncArrestPop(){
   }
 }
 
+function showArrestOverlay(type){
+  const isNo = type === 'no';
+  const overlay = isNo ? arrestNoOverlay : arrestYesOverlay;
+  if (!overlay) return;
+  if (!arrestNoOverlay || !arrestYesOverlay) return;
+  arrestNoOverlay.classList.add('hidden');
+  arrestNoOverlay.setAttribute('aria-hidden', 'true');
+  arrestYesOverlay.classList.add('hidden');
+  arrestYesOverlay.setAttribute('aria-hidden', 'true');
+
+  overlay.classList.remove('hidden');
+  overlay.setAttribute('aria-hidden', 'false');
+
+  if (!isNo){
+    const halves = overlay.querySelectorAll('.arrest-kira-half');
+    halves.forEach((half) => {
+      half.style.animation = 'none';
+      void half.offsetWidth;
+      half.style.animation = '';
+    });
+  }
+
+  setTimeout(() => {
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+  }, 1200);
+}
+
 async function startArrest1(byPlayerId){
   if (!state.roomCode) return;
   const aRef = ref(db, `rooms/${state.roomCode}/arrest1`);
@@ -3646,8 +3771,14 @@ async function resolveArrest1Answer(answer){
     await updateKiraArrestMeta({ usedAlibi: answer === 'no' });
   }
 
+  const eventId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const updates = {};
   updates[`rooms/${state.roomCode}/arrest1`] = null;
+  updates[`rooms/${state.roomCode}/arrest1Event`] = {
+    id: eventId,
+    type: answer,
+    at: Date.now()
+  };
   updates[`rooms/${state.roomCode}/turn/paused`] = false;
   await update(ref(db, `/`), updates);
 
@@ -5142,6 +5273,7 @@ btnJoin.addEventListener('click', async () => {
   // ★ 1（逮捕）
   subscribeArrest1();
   subscribeArrest1Meta();
+  subscribeArrest1Event();
   // ★ 裁き
   subscribeJudgement();
 
@@ -5771,6 +5903,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/judgementMeta`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Meta`), null),
+    set(ref(db, `rooms/${state.roomCode}/arrest1Event`), null),
   ]);
 
   if (initialDrawDisp){
@@ -5818,6 +5951,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/judgementMeta`)),
     remove(ref(db, `${base}/arrest1`)),
     remove(ref(db, `${base}/arrest1Meta`)),
+    remove(ref(db, `${base}/arrest1Event`)),
   ]);
   state.seatedTable = null;
   startPop.classList.add('hidden');
