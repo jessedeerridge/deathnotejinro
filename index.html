@@ -88,7 +88,7 @@
     left:50%; top:calc(50% + 17px);    transform:translate(-50%,-50%);
     width:64px; height:64px;
     border-radius:999px;
-    background:rgba(255,255,255,.85);
+    background:transparent;
     border:2px dashed rgba(17,17,17,.35);
     box-shadow:0 10px 22px rgba(0,0,0,.15);
     display:grid; place-items:center;
@@ -100,7 +100,7 @@
   }
   .center-area.active-drop{
     border-color:#111;
-    background:rgba(255,255,255,.95);
+    background:transparent;
     transform:translate(-50%,-50%) scale(1.03);
   }
 
@@ -1731,7 +1731,7 @@
 
 <!-- ★ 2：使用確認ポップ（使用者だけ） -->
 <div id="gun2ConfirmPop" class="gun2-confirm-pop hidden yesno-pop" aria-hidden="true">
-  <div class="msg">2を使用しますか？</div>
+  <div class="msg">拳銃を使用しますか？</div>
   <div class="dialog-buttons">
     <button id="btnGun2Yes" class="btn primary">はい</button>
     <button id="btnGun2No" class="btn ghost">いいえ</button>
@@ -1740,10 +1740,10 @@
 
 <!-- ★ 1：逮捕（対象ポップ） -->
 <div id="arrestPop" class="arrest-pop hidden yesno-pop" aria-hidden="true">
-  <div class="msg">Are you Kira?</div>
+  <div class="msg">あなたはキラですか。</div>
   <div class="dialog-buttons">
-    <button id="btnArrestYes" class="btn primary">Yes</button>
-    <button id="btnArrestNo" class="btn ghost">No</button>
+    <button id="btnArrestYes" class="btn primary">はい</button>
+    <button id="btnArrestNo" class="btn ghost">いいえ</button>
   </div>
 </div>
 
@@ -4693,7 +4693,7 @@ function syncJudgementUI(){
     const triggerAt = Number(j.noZeroAt || j.at || Date.now());
     if (lastJudgementNoZeroAt === triggerAt) return;
     lastJudgementNoZeroAt = triggerAt;
-    showJudgementPop('裁きの時間は行われませんでした。');
+    showJudgementPop('裁きは行われませんでした。');
     setTimeout(() => {
       setJudgementFade(false);
       finishJudgementNoZero().catch(console.warn);
