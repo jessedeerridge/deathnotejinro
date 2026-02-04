@@ -68,15 +68,15 @@
   }
   .player-label{
     display:inline-block;
-    padding:4px 8px;
+    padding:2px 4px;
     border-radius:999px;
-    background:#f8f8f8;
-    border:1px solid #ddd;
+    background:transparent;
+    border:none;
     font-size:12px;
     white-space:nowrap;
     transform-origin:center;
   }
-  .player-tag.me .player-label{ background:#111;color:#fff;border-color:#111; }
+  .player-tag.me .player-label{ color:#111;font-weight:800; }
   .player-tag .player-name{ display:inline-block; }
 
   .center-area{
@@ -104,7 +104,7 @@
   /* ★ センター捨て札スタック（表向きで積み上げ） */
   .discard-stack{
     position:absolute;
-    left:50%; top:calc(50% + 16px);
+    left:50%; top:calc(50% + 22px);
     transform:translate(-50%,-50%);
     width:0; height:0;
     z-index:11;
@@ -468,7 +468,7 @@
     position:fixed;
     left:50%;
     top:50%;
-    transform:translate(-50%,-150px);
+    transform:translate(-50%,-146px);
     padding:4px 10px;
     border-radius:999px;
     background:#111;
@@ -1463,6 +1463,22 @@
     border:1px solid rgba(255,255,255,.08);
   }
   .vote-pop.hidden{display:none;}
+  .vote7-instruction{
+    position:absolute;
+    left:50%;
+    top:100%;
+    transform:translate(-50%,6px);
+    padding:4px 8px;
+    border-radius:999px;
+    background:rgba(17,17,17,.9);
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    white-space:nowrap;
+    pointer-events:none;
+    box-shadow:0 10px 24px rgba(0,0,0,.2);
+    z-index:52;
+  }
 
   /* ★ 7：投票タグアニメ */
   @keyframes voteTagPulse{
@@ -1491,7 +1507,7 @@
     display:flex;
     flex-direction:column;
     gap:4px;
-    z-index:35;
+    z-index:60;
     pointer-events:none;
   }
   .vote7-result-tag{
@@ -1503,7 +1519,10 @@
     border-radius:999px;
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
-    z-index:36;
+    z-index:61;
+  }
+  .player-tag.vote7-active{
+    z-index:20;
   }
 </style>
 </head>
@@ -2654,7 +2673,7 @@ function updateTurnUI(){
         exchangeReturnPop.textContent = '手札から渡したいカードを選んでください。';
         exchangeReturnPop.classList.remove('hidden');
       } else {
-        exchangePop.textContent = '8の効果：返すカードを選択中';
+        showTopPop = false;
       }
     } else {
       exchangePop.textContent = '8の効果：処理中';
@@ -2673,16 +2692,7 @@ function updateTurnUI(){
   if (!vActive){
     votePop.classList.add('hidden');
   } else {
-    votePop.classList.remove('hidden');
-    const vPhase = vote7Phase();
-    const myVoted = !!(state.vote7?.votes && state.vote7.votes[state.userId]);
-    if (vPhase === 'voting'){
-      votePop.textContent = myVoted
-        ? '7の効果：投票先を選び直せます'
-        : '7の効果：投票するプレイヤーを選択';
-    } else {
-      votePop.textContent = '7の効果：投票結果表示中';
-    }
+    votePop.classList.add('hidden');
   }
 
   // 9 dir dialog
@@ -6197,6 +6207,17 @@ function renderPlayerCircle(players){
     nameSpan.textContent = p.name;
     labelSpan.appendChild(nameSpan);
     tag.appendChild(labelSpan);
+
+    if (vActive){
+      tag.classList.add('vote7-active');
+    }
+
+    if (vActive && vPhase === 'voting'){
+      const instruction = document.createElement('div');
+      instruction.className = 'vote7-instruction';
+      instruction.textContent = 'キラだと思う人を選んでください。';
+      tag.appendChild(instruction);
+    }
 
     if (reveal011TargetId && p.id === reveal011TargetId && p.id !== state.userId){
       tag.classList.add('reveal011-hand');
