@@ -1242,12 +1242,63 @@
   }
   .help-pop-title{font-weight:800;font-size:14px;}
   .help-pop-body{padding:12px;overflow:auto;max-height:calc(70vh - 48px);}
-  .role-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;}
-  .role-card{
-    width:72px;height:108px;border-radius:10px;border:1px solid #222;background:#111;
-    box-shadow:0 6px 16px rgba(0,0,0,.10);
-    flex:0 0 auto;display:flex;align-items:stretch;justify-content:stretch;
-    font-size:10px;font-weight:700;color:#fff;
+  .help-section{display:flex;flex-direction:column;gap:8px;}
+  .help-section + .help-section{margin-top:12px;}
+  .help-section-title{font-weight:900;font-size:13px;}
+  .help-identity-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+  }
+  .help-identity-item{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+  }
+  .help-identity-card{
+    width:60px;height:90px;border-radius:8px;border:1px solid #ddd;background:#fff;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+    flex:0 0 auto;
+  }
+  .help-identity-card.identity-card-face{
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+  }
+  .help-identity-desc .name{font-weight:900;margin-bottom:4px;}
+  .help-identity-desc .text{font-size:12px;line-height:1.5;color:#222;white-space:pre-wrap;}
+  .help-divider{
+    border-top:1px solid #eee;
+    margin:12px 0;
+  }
+  .help-deck-grid{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:10px;
+  }
+  .help-deck-card{
+    width:78px;height:117px;border-radius:10px;border:1px solid #ddd;background:#111;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+    display:flex;align-items:stretch;justify-content:stretch;font-size:10px;font-weight:600;
+    position:relative;
+    color:#fff;
+  }
+  .help-deck-count{
+    position:absolute;
+    right:-6px;
+    top:-6px;
+    padding:1px 6px;
+    min-width:18px;
+    border-radius:999px;
+    background:#f1f1f1;
+    border:1px solid #ddd;
+    color:#666;
+    font-size:10px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.12);
   }
 
 .card-face{
@@ -1754,7 +1805,7 @@
 <div id="helpBackdrop" class="help-pop-backdrop hidden">
   <div class="help-pop" role="dialog" aria-modal="true" aria-label="カード一覧">
     <div class="help-pop-header">
-      <div class="help-pop-title">山札カード</div>
+      <div class="help-pop-title">ヘルプ</div>
       <button id="btnHelpClose" class="btn ghost" style="padding:2px 6px;font-size:12px;">×</button>
     </div>
     <div class="help-pop-body" id="helpBody"></div>
@@ -1975,6 +2026,14 @@ const CARD_LIBRARY = [
   { id: "9", name: "取調", effect: "右か左かを選ぶ。全員、最小を隣のプレイヤーに渡す。", image: "取調.jpg" },
   { id: "13", name: "死神", effect: "全員が目を閉じ、キラはデスノートを持っているプレイヤーを知る。", image: "死神.jpg" },
 ];
+const IDENTITY_HELP = [
+  { id: "キラ", name: "キラ", text: "デスノート側。Lを出し抜いて勝利を目指す。" },
+  { id: "L", name: "L", text: "警察と協力してキラを見つける。" },
+  { id: "警察1", name: "警察", text: "Lの味方。キラの逮捕を助ける。" },
+  { id: "警察2", name: "警察", text: "Lの味方。キラの逮捕を助ける。" },
+  { id: "信者", name: "信者", text: "キラの味方。キラを支援する。" },
+  { id: "L2", name: "L2", text: "Lの味方。捜査に協力する。" },
+];
 const CARD_LOOKUP = new Map(CARD_LIBRARY.map(card => [card.id, card]));
 const ROLE_HELP = CARD_LIBRARY.map(card => ({
   id: card.id,
@@ -2071,19 +2130,66 @@ function applyCardFace(cardEl, cardId, { size = '' } = {}){
 
 function renderHelpList(){
   helpBody.innerHTML = '';
-  ROLE_HELP.forEach((r) => {
-    const row = document.createElement('div');
-    row.className = 'role-row';
+  const identitySection = document.createElement('div');
+  identitySection.className = 'help-section';
+  const identityTitle = document.createElement('div');
+  identityTitle.className = 'help-section-title';
+  identityTitle.textContent = '正体一覧';
+  identitySection.appendChild(identityTitle);
+
+  const identityGrid = document.createElement('div');
+  identityGrid.className = 'help-identity-grid';
+  IDENTITY_HELP.forEach((r) => {
+    const item = document.createElement('div');
+    item.className = 'help-identity-item';
     const card = document.createElement('div');
-    card.className = 'role-card';
-    applyCardFace(card, r.id);
+    card.className = 'help-identity-card';
+    applyIdentityCardFace(card, r.id, { showText: false });
     const desc = document.createElement('div');
-    desc.className = 'role-desc';
+    desc.className = 'help-identity-desc';
     desc.innerHTML = `<div class="name">${r.name}</div><div class="text">${r.text}</div>`;
-    row.appendChild(card);
-    row.appendChild(desc);
-    helpBody.appendChild(row);
+    item.appendChild(card);
+    item.appendChild(desc);
+    identityGrid.appendChild(item);
   });
+  identitySection.appendChild(identityGrid);
+  helpBody.appendChild(identitySection);
+
+  const divider = document.createElement('div');
+  divider.className = 'help-divider';
+  helpBody.appendChild(divider);
+
+  const deckSection = document.createElement('div');
+  deckSection.className = 'help-section';
+  const deckTitle = document.createElement('div');
+  deckTitle.className = 'help-section-title';
+  deckTitle.textContent = 'デッキカード一覧';
+  deckSection.appendChild(deckTitle);
+
+  const playerCount = Math.max(latestPlayers.length || 0, state.room?.maxPlayers || 0, 4);
+  const deckCards = buildDeckForPlayers(playerCount);
+  const deckCounts = deckCards.reduce((acc, cardId) => {
+    const key = String(cardId);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const deckGrid = document.createElement('div');
+  deckGrid.className = 'help-deck-grid';
+  CARD_LIBRARY.forEach((cardInfo) => {
+    const count = deckCounts[cardInfo.id] || 0;
+    if (count <= 0) return;
+    const card = document.createElement('div');
+    card.className = 'help-deck-card';
+    applyCardFace(card, cardInfo.id);
+    const countTag = document.createElement('div');
+    countTag.className = 'help-deck-count';
+    countTag.textContent = `${count}`;
+    card.appendChild(countTag);
+    deckGrid.appendChild(card);
+  });
+  deckSection.appendChild(deckGrid);
+  helpBody.appendChild(deckSection);
 }
 function openHelp(){ renderHelpList(); helpBackdrop.classList.remove('hidden'); }
 function closeHelp(){ helpBackdrop.classList.add('hidden'); }
