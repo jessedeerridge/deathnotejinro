@@ -117,7 +117,7 @@
     background:#111;
     display:flex;align-items:stretch;justify-content:stretch;
     box-shadow:0 10px 26px rgba(0,0,0,.18);
-    transform:translate(-50%,-50%) translate(26px, 22px) rotate(3deg);
+    transform:translate(-50%,-50%) translate(40px, 36px) rotate(3deg);
     z-index:10;
     pointer-events:none;
   }
@@ -1606,7 +1606,7 @@
         <div id="deckCount" class="deck-count">0</div>
       </div>
 
-      <div id="centerArea" class="center-area">CENTER</div>
+      <div id="centerArea" class="center-area"></div>
 
       <div id="discardStack" class="discard-stack"></div>
       <div id="card1Spot" class="card1-spot hidden"></div>
@@ -3194,7 +3194,7 @@ function subscribeArrest1Event(){
 }
 
 /* ====== 正体 ====== */
-function applyIdentityCardFace(cardEl, identity, { showText = true } = {}){
+function applyIdentityCardFace(cardEl, identity, { showText = false } = {}){
   if (!cardEl) return;
   const safeIdentity = String(identity || '').trim();
   cardEl.classList.add('identity-card-face');
@@ -3203,11 +3203,7 @@ function applyIdentityCardFace(cardEl, identity, { showText = true } = {}){
   } else {
     cardEl.style.backgroundImage = '';
   }
-  if (showText){
-    cardEl.textContent = safeIdentity || '？';
-  } else {
-    cardEl.textContent = '';
-  }
+  cardEl.textContent = showText ? (safeIdentity || '？') : '';
 }
 
 function renderMyIdentity(){
@@ -3217,11 +3213,11 @@ function renderMyIdentity(){
     myIdentityEl.classList.add('hidden');
     myIdentityEl.classList.remove('identity-card-face');
     myIdentityEl.style.backgroundImage = '';
-    myIdentityEl.textContent = '？';
+    myIdentityEl.textContent = '';
     return;
   }
   myIdentityEl.classList.remove('hidden');
-  applyIdentityCardFace(myIdentityEl, identity);
+  applyIdentityCardFace(myIdentityEl, identity, { showText: false });
 }
 
 /* ====== 捨て札 ====== */
