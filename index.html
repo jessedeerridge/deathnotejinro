@@ -853,6 +853,7 @@
     position:relative;
     width:170px;
     height:250px;
+    border-radius:12px;
   }
   .arrest-kira-half{
     position:absolute;
@@ -860,13 +861,32 @@
     border-radius:12px;
     border:2px solid rgba(0,0,0,.35);
     background:#fff;
-    color:#111;
-    font-weight:900;
-    font-size:32px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    background-image:url('キラ.jpg');
+    background-size:cover;
+    background-position:center;
     box-shadow:0 18px 40px rgba(0,0,0,.25);
+  }
+  .arrest-kira-half::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    background:linear-gradient(130deg, rgba(255,255,255,.2), rgba(0,0,0,.12));
+    mix-blend-mode:screen;
+  }
+  .arrest-kira-overlay{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:150px;
+    height:150px;
+    transform:translate(-50%,-50%);
+    background-image:url('dnyes.jpg');
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    filter:drop-shadow(0 10px 22px rgba(0,0,0,.35));
+    pointer-events:none;
   }
   .arrest-kira-half.left{
     clip-path:polygon(0 0, 52% 0, 48% 100%, 0 100%);
@@ -995,14 +1015,15 @@
   }
 
   @keyframes judgementTagPulse{
-    0%{ transform:translate(-50%,-50%) scale(1); }
-    50%{ transform:translate(-50%,-50%) scale(1.08); }
-    100%{ transform:translate(-50%,-50%) scale(1); }
+    0%{ transform:scale(1); }
+    50%{ transform:scale(1.08); }
+    100%{ transform:scale(1); }
   }
   .player-tag.judgement-targetable{
     cursor:pointer;
+  }
+  .player-tag.judgement-targetable .player-label{
     animation: judgementTagPulse 820ms ease-in-out infinite;
-    box-shadow:0 0 0 2px rgba(17,17,17,.12);
   }
   .player-tag.judgement-self-hidden{
     opacity:0;
@@ -1044,7 +1065,8 @@
   }
   .judgement-canvas{
     position:absolute;
-    inset:0;
+    top:0;
+    left:0;
     cursor:crosshair;
     touch-action:none;
   }
@@ -1567,7 +1589,7 @@
     display:flex;
     flex-direction:column;
     gap:4px;
-    z-index:60;
+    z-index:90;
     pointer-events:none;
   }
   .vote7-result-tag{
@@ -1579,7 +1601,7 @@
     border-radius:999px;
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
-    z-index:61;
+    z-index:91;
   }
 
   /* ★ 9：尋問 方向選択ボタン */
@@ -1635,7 +1657,7 @@
     100%{ transform:scale(0.96); }
   }
   .player-tag.vote7-active{
-    z-index:20;
+    z-index:70;
   }
 </style>
 </head>
@@ -1754,10 +1776,10 @@
 <div id="arrestYesOverlay" class="arrest-overlay hidden" aria-hidden="true">
   <div class="arrest-yes-stack">
     <div class="arrest-kira-card">
-      <div class="arrest-kira-half left">キラ</div>
-      <div class="arrest-kira-half right">キラ</div>
+      <div class="arrest-kira-half left"></div>
+      <div class="arrest-kira-half right"></div>
+      <div class="arrest-kira-overlay" aria-hidden="true"></div>
     </div>
-    <div class="arrest-image yes"></div>
   </div>
 </div>
 
@@ -1770,7 +1792,7 @@
     <div class="judgement-clock-hand second"></div>
     <div class="judgement-clock-center"></div>
   </div>
-  <div id="judgementCountdownText" class="judgement-countdown-text">3..</div>
+  <div id="judgementCountdownText" class="judgement-countdown-text">38..</div>
 </div>
 <div id="judgementNotebook" class="judgement-notebook hidden">
   <div class="judgement-page"></div>
@@ -2025,7 +2047,7 @@ const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
   { id: "0", name: "デスノート", effect: "ラウンドの終わりにキラがデスノートを持っているなら必ず裁きを行う。(1ラウンド目は無し。)", image: "デスノート.jpg" },
-  { id: "1", name: "逮捕", effect: "Lだけが使える。", image: "逮捕.jpg" },
+  { id: "1", name: "逮捕", effect: "Lだけが使える。キラなら一度だけ「いいえ」を選べる。", image: "逮捕.jpg" },
   { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
   { id: "3", name: "偽名", effect: "ノートに名前を書かれても一度だけ死なない。", image: "偽名.jpg" },
   { id: "4", name: "アリバイ", effect: "このカードがあれば、あなたがキラでも一度だけ逮捕されない。その時にこのカードは見せない。", image: "アリバイ.jpg" },
@@ -2485,10 +2507,10 @@ function updateExchangeLink(){
   linkLayer.innerHTML = `
     <defs>
       <marker id="arrowEnd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)"></path>
+        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)" stroke="#fff" stroke-width="1" stroke-linejoin="round"></path>
       </marker>
       <marker id="arrowStart" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto">
-        <path d="M10,0 L0,5 L10,10 Z" fill="rgba(17,17,17,.85)"></path>
+        <path d="M10,0 L0,5 L10,10 Z" fill="rgba(17,17,17,.85)" stroke="#fff" stroke-width="1" stroke-linejoin="round"></path>
       </marker>
     </defs>
     <line
@@ -2526,12 +2548,12 @@ function updateGun2Link(){
     return;
   }
 
-    const byEl = getPlayerTagEl(g.by);
-    const tgEl = getPlayerTagEl(g.targetId);
-    if (!byEl){
-      clearGun2Layer();
-      return;
-    }
+  const byEl = getPlayerTagEl(g.by);
+  const tgEl = getPlayerTagEl(g.targetId);
+  if (!byEl || !tgEl){
+    clearGun2Layer();
+    return;
+  }
 
   const pcRect = playerCircle.getBoundingClientRect();
   const br = byEl.getBoundingClientRect();
@@ -2539,44 +2561,10 @@ function updateGun2Link(){
   const x1 = (br.left + br.width/2) - pcRect.left;
   const y1 = (br.top  + br.height/2) - pcRect.top;
 
-  let x2 = x1;
-  let y2 = y1;
-
-  if (g.targetId === state.userId){
-    const idx = Number(g?.targetPick?.idx);
-    const myCard = Number.isFinite(idx) ? myHandEl?.querySelector(`.my-card[data-index="${idx}"]`) : null;
-    if (myCard){
-      const cr = myCard.getBoundingClientRect();
-      x2 = (cr.left + cr.width/2) - pcRect.left;
-      y2 = (cr.top  + cr.height/2) - pcRect.top;
-    } else if (myHandEl){
-      const hr = myHandEl.getBoundingClientRect();
-      x2 = (hr.left + hr.width/2) - pcRect.left;
-      y2 = (hr.top + 8) - pcRect.top;
-    }
-  } else if (tgEl){
-    const circleEl = tgEl.querySelector('.mini-hand-circle');
-    if (circleEl){
-      const cr = circleEl.getBoundingClientRect();
-      const cx = (cr.left + cr.width/2) - pcRect.left;
-      const cy = (cr.top + cr.height/2) - pcRect.top;
-      const dx = cx - x1;
-      const dy = cy - y1;
-      const dist = Math.max(1, Math.hypot(dx, dy));
-      const radius = Math.min(cr.width, cr.height) / 2 + 2;
-      const ux = dx / dist;
-      const uy = dy / dist;
-      x2 = cx - ux * radius;
-      y2 = cy - uy * radius;
-    } else {
-      const tr = tgEl.getBoundingClientRect();
-      x2 = (tr.left + tr.width/2) - pcRect.left;
-      y2 = (tr.top  + tr.height) - pcRect.top + 2;
-    }
-  } else {
-    clearGun2Layer();
-    return;
-  }
+  const labelEl = tgEl.querySelector('.player-label') || tgEl;
+  const tr = labelEl.getBoundingClientRect();
+  const x2 = (tr.left + tr.width / 2) - pcRect.left;
+  const y2 = (tr.top + tr.height / 2) - pcRect.top;
 
   const width = Math.max(1, pcRect.width);
   const height = Math.max(1, pcRect.height);
@@ -2665,7 +2653,7 @@ function updateWatchLink(){
   watchLayer.innerHTML = `
     <defs>
       <marker id="watchArrowEnd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)"></path>
+        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)" stroke="#fff" stroke-width="1" stroke-linejoin="round"></path>
       </marker>
     </defs>
     <line
@@ -4585,8 +4573,27 @@ function openJudgementNotebook(enableDraw){
   judgementNotebook.classList.remove('hidden');
   judgementNotebook.classList.add('open');
   if (judgementCanvas){
-    judgementCanvas.width = judgementNotebook.clientWidth;
-    judgementCanvas.height = judgementNotebook.clientHeight;
+    const pages = judgementNotebook.querySelectorAll('.judgement-page');
+    const targetPage = pages?.[1] || pages?.[0];
+    if (targetPage){
+      const noteRect = judgementNotebook.getBoundingClientRect();
+      const pageRect = targetPage.getBoundingClientRect();
+      const left = pageRect.left - noteRect.left;
+      const top = pageRect.top - noteRect.top;
+      judgementCanvas.width = Math.round(pageRect.width);
+      judgementCanvas.height = Math.round(pageRect.height);
+      judgementCanvas.style.left = `${left}px`;
+      judgementCanvas.style.top = `${top}px`;
+      judgementCanvas.style.width = `${pageRect.width}px`;
+      judgementCanvas.style.height = `${pageRect.height}px`;
+    } else {
+      judgementCanvas.width = judgementNotebook.clientWidth;
+      judgementCanvas.height = judgementNotebook.clientHeight;
+      judgementCanvas.style.left = '0px';
+      judgementCanvas.style.top = '0px';
+      judgementCanvas.style.width = `${judgementNotebook.clientWidth}px`;
+      judgementCanvas.style.height = `${judgementNotebook.clientHeight}px`;
+    }
     judgementCanvas.style.pointerEvents = enableDraw ? 'auto' : 'none';
   }
   judgementDrawActive = !!enableDraw;
@@ -4670,7 +4677,8 @@ function syncJudgementUI(){
     setJudgementSecondHandPosition(remaining);
     const shouldShowCountdown = j.countdownMode === 'postWrite' ? true : !j.kiraHasZero;
     if (remaining > 0){
-      showJudgementMessage(shouldShowCountdown, `${remaining}..`);
+      const displayCount = 41 - remaining;
+      showJudgementMessage(shouldShowCountdown, `${displayCount}..`);
       if (judgementCountdownTimer){
         clearTimeout(judgementCountdownTimer);
       }
@@ -5701,7 +5709,7 @@ function getDiscardStartPoint(targetId){
       return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
     }
     const tr = tag.getBoundingClientRect();
-    return { x: tr.left + tr.width/2, y: tr.top + tr.height/2 };
+    return { x: tr.left + tr.width/2, y: tr.top + tr.height + 18 };
   }
   const pc = playerCircle.getBoundingClientRect();
   return { x: pc.left + pc.width/2, y: pc.top + pc.height/2 };
@@ -6613,13 +6621,14 @@ function renderPlayerCircle(players){
       });
     }
 
+    const eliminated = isEliminated(p.id);
     const j = getJudgement();
     const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
     const isJudgementWriting = !!(j?.active && j.phase === 'writing' && j.kiraId === state.userId);
     if ((isJudgementSelecting || isJudgementWriting) && p.id === state.userId){
       tag.classList.add('judgement-self-hidden');
     }
-    if (isJudgementSelecting && p.id !== state.userId){
+    if (isJudgementSelecting && p.id !== state.userId && !eliminated){
       tag.classList.add('judgement-targetable');
       tag.addEventListener('click', async () => {
         await pickJudgementTarget(p.id);
@@ -6652,7 +6661,6 @@ function renderPlayerCircle(players){
     const rawHandCards = Array.isArray(handData?.cards) ? handData.cards : [];
     const displayHandCards = getCardsWithReveal011Pending(p.id, rawHandCards);
     const eliminatedRecord = state.eliminated?.[p.id];
-    const eliminated = isEliminated(p.id);
     const eliminatedIdentity = eliminatedRecord?.identity || handData?.identity || '？';
     const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
