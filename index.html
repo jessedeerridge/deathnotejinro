@@ -78,6 +78,14 @@
   }
   .player-tag.me .player-label{ background:#111;color:#fff;border-color:#111; }
   .player-tag .player-name{ display:inline-block; }
+  .player-tag.seat-steal-target .player-label{
+    cursor:pointer;
+    border-color:#f59e0b;
+    box-shadow:0 0 0 2px rgba(245,158,11,.15);
+  }
+  .player-tag.seat-steal-target .player-label:hover{
+    background:#fff7ed;
+  }
 
   .center-area{
     position:absolute;
@@ -6258,6 +6266,52 @@ async function renderSeatTabs(){
   }
 }
 
+async function stealSeatFromPlayer(target){
+  if (!state.roomCode) return;
+  if (state.seatedTable !== null) return;
+  if (!target?.id || !target?.seatIndex) return;
+  if (target.id === state.userId) return;
+
+  const seatRef = ref(db, `rooms/${state.roomCode}/tables/${target.seatIndex}`);
+  const seatSnap = await get(seatRef);
+  const seatData = seatSnap.val();
+  if (!seatData || seatData.playerId !== target.id) return;
+
+  const updates = {};
+  updates[`rooms/${state.roomCode}/tables/${target.seatIndex}`] = {
+    playerId: state.userId,
+    playerName: state.userName
+  };
+
+  const handSnap = await get(ref(db, `rooms/${state.roomCode}/hands/${target.id}`));
+  if (handSnap.exists()){
+    updates[`rooms/${state.roomCode}/hands/${state.userId}`] = handSnap.val();
+    updates[`rooms/${state.roomCode}/hands/${target.id}`] = null;
+  }
+
+  const aliasSnap = await get(ref(db, `rooms/${state.roomCode}/alias3Used/${target.id}`));
+  if (aliasSnap.exists()){
+    updates[`rooms/${state.roomCode}/alias3Used/${state.userId}`] = aliasSnap.val();
+    updates[`rooms/${state.roomCode}/alias3Used/${target.id}`] = null;
+  }
+
+  const eliminatedSnap = await get(ref(db, `rooms/${state.roomCode}/eliminated/${target.id}`));
+  if (eliminatedSnap.exists()){
+    updates[`rooms/${state.roomCode}/eliminated/${state.userId}`] = eliminatedSnap.val();
+    updates[`rooms/${state.roomCode}/eliminated/${target.id}`] = null;
+  }
+
+  const turnSnap = await get(ref(db, `rooms/${state.roomCode}/turn/currentPlayerId`));
+  if (turnSnap.exists() && turnSnap.val() === target.id){
+    updates[`rooms/${state.roomCode}/turn/currentPlayerId`] = state.userId;
+  }
+
+  await update(ref(db, `/`), updates);
+
+  state.seatedTable = target.seatIndex;
+  seatPop.classList.add('hidden');
+}
+
 btnSeatCancel.onclick = () => { seatPop.classList.add('hidden'); state.seatedTable = null; };
 
 function subscribePlayers(){
@@ -6379,6 +6433,15 @@ function renderPlayerCircle(players){
     nameSpan.textContent = p.name;
     labelSpan.appendChild(nameSpan);
     tag.appendChild(labelSpan);
+
+    const canStealSeat = state.seatedTable === null && p.id !== state.userId;
+    if (canStealSeat){
+      tag.classList.add('seat-steal-target');
+      labelSpan.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await stealSeatFromPlayer(p);
+      });
+    }
 
     if (vActive){
       tag.classList.add('vote7-active');
