@@ -1065,6 +1065,7 @@
   .my-hand-wrapper{margin-top:16px;text-align:center;}
   .my-hand-title{display:none;}
   .my-hand-row{
+    position:relative;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -1358,6 +1359,9 @@
     font-size:6px;
     padding:1px;
   }
+  .card-face.zero-card .card-image{
+    border:none;
+  }
 
 
   .role-desc{flex:1 1 auto;}
@@ -1366,7 +1370,8 @@
 
   .pick-pop{
     position:fixed;
-    left:50%; top:70px;
+    left:50%;
+    bottom:14px;
     transform:translateX(-50%);
     background:rgba(20,20,20,.92);color:#fff;
     padding:10px 12px;border-radius:14px;
@@ -1509,13 +1514,14 @@
 
   /* ★ 9：尋問 方向選択ボタン */
   .dir-choice{
-    position:fixed;
+    position:absolute;
     left:0;
     right:0;
-    bottom:110px;
+    top:50%;
+    transform:translateY(-50%);
     display:flex;
     justify-content:space-between;
-    padding:0 18px;
+    padding:0 6px;
     z-index:70;
     pointer-events:none;
   }
@@ -1609,6 +1615,10 @@
       <div class="my-hand-row" id="myHandRow">
         <div id="myIdentity" class="my-card my-identity-card hidden">？</div>
         <div id="myHand" class="my-hand"></div>
+        <div id="dirChoice" class="dir-choice hidden" aria-hidden="true">
+          <button class="dir-choice-btn left" id="btnDirLeft" aria-label="左を選択">◀</button>
+          <button class="dir-choice-btn right" id="btnDirRight" aria-label="右を選択">▶</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1706,7 +1716,7 @@
 </div>
 
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
-<div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
+<div id="pickPop" class="pick-pop hidden">小さい方のカードを選んでください。</div>
 <div id="exchangeReturnPop" class="exchange-return-pop hidden">手札から渡したいカードを選んでください。</div>
 <div id="witnessPop" class="witness-pop hidden">5の効果：正体カード（裏）をクリックして対象選択</div>
 <div id="votePop" class="vote-pop hidden">7の効果：投票するプレイヤーを選択</div>
@@ -1726,11 +1736,6 @@
       <button class="btn ghost" id="btnKickNo">いいえ</button>
     </div>
   </div>
-</div>
-
-<div id="dirChoice" class="dir-choice hidden" aria-hidden="true">
-  <button class="dir-choice-btn left" id="btnDirLeft" aria-label="左を選択">◀</button>
-  <button class="dir-choice-btn right" id="btnDirRight" aria-label="右を選択">▶</button>
 </div>
 
 <button id="hostSettingsBtn" class="host-settings-btn" title="設定">⚙</button>
@@ -1976,6 +1981,9 @@ function buildCardFace(cardId, { size = '' } = {}){
   const info = getCardInfo(cardId);
   const face = document.createElement('div');
   face.className = `card-face${size ? ` ${size}` : ''}`;
+  if (info.id === '0'){
+    face.classList.add('zero-card');
+  }
 
   const circle = document.createElement('div');
   circle.className = 'card-circle';
@@ -2666,17 +2674,11 @@ function updateTurnUI(){
   playerCircle.classList.toggle('turn-paused', !!state.turn.paused);
 
   // 9 pop
-  if (!isInvestigationActive()){
-    pickPop.classList.add('hidden');
-  } else {
+  if (isInvPickingMin()){
+    pickPop.textContent = '小さい方のカードを選んでください。';
     pickPop.classList.remove('hidden');
-    if (isInvChoosingDir()){
-      pickPop.textContent = (state.investigation?.by === state.userId)
-        ? '9の効果：右/左 を選択してください'
-        : '9の効果：プレイヤーが右/左を選択中';
-    } else {
-      pickPop.textContent = '9の効果：最小カードをクリックして選択';
-    }
+  } else {
+    pickPop.classList.add('hidden');
   }
 
   // 8 pop
@@ -2723,19 +2725,20 @@ function updateTurnUI(){
   }
 
   // 9 dir buttons
-  if (isInvChoosingDir() && state.investigation?.by === state.userId){
+  const inv = state.investigation;
+  const invPhaseName = invPhase();
+  const showDirChoice = isInvestigationActive() && (invPhaseName === 'chooseDir' || invPhaseName === 'pickMin');
+  if (showDirChoice){
     dirChoice.classList.remove('hidden');
-    const hasChoice = !!localDirChoice;
-    btnDirLeft.disabled = hasChoice;
-    btnDirRight.disabled = hasChoice;
-    if (localDirChoice === 'left'){
-      dirChoice.classList.add('selected-left');
-      dirChoice.classList.remove('selected-right');
-    } else if (localDirChoice === 'right'){
-      dirChoice.classList.add('selected-right');
-      dirChoice.classList.remove('selected-left');
-    } else {
-      dirChoice.classList.remove('selected-left', 'selected-right');
+    const isInvoker = inv?.by === state.userId;
+    const canSelect = invPhaseName === 'chooseDir' && isInvoker && !inv?.dir;
+    const effectiveDir = inv?.dir || (isInvoker ? localDirChoice : null);
+    btnDirLeft.disabled = !canSelect || !!effectiveDir;
+    btnDirRight.disabled = !canSelect || !!effectiveDir;
+    dirChoice.classList.toggle('selected-left', effectiveDir === 'left');
+    dirChoice.classList.toggle('selected-right', effectiveDir === 'right');
+    if (!isInvoker){
+      localDirChoice = null;
     }
   } else {
     localDirChoice = null;
