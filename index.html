@@ -1068,6 +1068,11 @@
     50% { transform:translate(-50%,0) scale(1.2); }
     100%{ transform:translate(-50%,0) scale(0.96); }
   }
+  @keyframes judgementPickPulseBoost{
+    0%  { transform:translate(-50%,0) scale(0.98); }
+    50% { transform:translate(-50%,0) scale(1.3); }
+    100%{ transform:translate(-50%,0) scale(0.98); }
+  }
   .player-tag.judgement-self-hidden{
     opacity:0;
     pointer-events:none;
@@ -1603,6 +1608,9 @@
     cursor:pointer;
     pointer-events:auto;
   }
+  .judgement-pick-card.boosted{
+    animation: judgementPickPulseBoost 760ms ease-in-out infinite;
+  }
   .player-tag .judgement-pick-card{
     margin-left:-40px;
   }
@@ -1904,6 +1912,9 @@
   <div class="judgement-page"></div>
   <canvas id="judgementCanvas" class="judgement-canvas"></canvas>
 </div>
+<div id="judgementSelectPop" class="judgement-confirm-pop hidden" aria-hidden="true">
+  <div class="msg" id="judgementSelectMessage">プレイヤーを１人選んでください。</div>
+</div>
 <div id="judgementTargetPop" class="judgement-confirm-pop hidden" aria-hidden="true">
   <div class="msg" id="judgementTargetMessage">選んだプレイヤーの名前を書いてください。</div>
 </div>
@@ -2149,6 +2160,8 @@ const judgementCountdownText = document.getElementById('judgementCountdownText')
 const judgementSecondHand = judgementMessage?.querySelector('.judgement-clock-hand.second') || null;
 const judgementNotebook = document.getElementById('judgementNotebook');
 const judgementCanvas = document.getElementById('judgementCanvas');
+const judgementSelectPop = document.getElementById('judgementSelectPop');
+const judgementSelectMessage = document.getElementById('judgementSelectMessage');
 const judgementTargetPop = document.getElementById('judgementTargetPop');
 const judgementTargetMessage = document.getElementById('judgementTargetMessage');
 const judgementWritePop = document.getElementById('judgementWritePop');
@@ -2159,8 +2172,8 @@ const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
   { id: "0", name: "デスノート", effect: "ラウンドの終わりにキラがデスノートを持っているなら必ず裁きを行う。(1ラウンド目は無し。)", image: "デスノート.jpg" },
-  { id: "1", name: "逮捕", effect: "Lだけが使える。キラなら一度だけ「いいえ」を選べる。", image: "逮捕.jpg" },
-  { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
+  { id: "1", name: "逮捕", effect: "キラを逮捕するために使う。Lだけが使える。", image: "逮捕.jpg" },
+  { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に、数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
   { id: "3", name: "偽名", effect: "ノートに名前を書かれても一度だけ死なない。", image: "偽名.jpg" },
   { id: "4", name: "アリバイ", effect: "このカードがあれば、あなたがキラでも一度だけ逮捕されない。その時にこのカードは見せない。", image: "アリバイ.jpg" },
   { id: "5", name: "目撃", effect: "選んだプレイヤーの正体カードをこっそり見る。", image: "目撃.jpg" },
@@ -2177,7 +2190,6 @@ const IDENTITY_HELP = [
   { id: "警察2", name: "警察", text: "Lの味方。キラの逮捕を助けよう。" },
   { id: "信者", name: "信者", text: "キラの味方。キラを支援しよう。" },
   { id: "L2", name: "L", text: "逮捕ができるのはLだけだ。警察と協力してキラを見つけだそう。" },
-  { id: "L2", name: "w", text: "逮捕ができるのはLだけだ。警察と協力してキラを見つけだそう。" },
   { id: "ワタリ", name: "ワタリ", text: "Lの正体を知る。協力してキラを見つけだそう。" },
 ];
 
@@ -4707,6 +4719,15 @@ function showJudgementMessage(show, message){
   judgementMessage.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
 
+function showJudgementSelectPop(show, message){
+  if (!judgementSelectPop) return;
+  if (judgementSelectMessage && message){
+    judgementSelectMessage.textContent = message;
+  }
+  judgementSelectPop.classList.toggle('hidden', !show);
+  judgementSelectPop.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
 function showJudgementTargetPop(show, message){
   if (!judgementTargetPop) return;
   if (judgementTargetMessage && message){
@@ -4803,6 +4824,7 @@ function syncJudgementUI(){
   if (!hasActive){
     setJudgementFade(false);
     showJudgementMessage(false);
+    showJudgementSelectPop(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
@@ -4836,6 +4858,7 @@ function syncJudgementUI(){
   if (j.phase === 'countdown'){
     setJudgementFade(true, isActiveKira);
     showJudgementTargetPop(false);
+    showJudgementSelectPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
     judgementNotebook?.classList.add('hidden');
@@ -4864,6 +4887,7 @@ function syncJudgementUI(){
   if (j.phase === 'noZero'){
     setJudgementFade(true, isActiveKira);
     showJudgementMessage(false);
+    showJudgementSelectPop(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
@@ -4892,14 +4916,17 @@ function syncJudgementUI(){
           ctx?.clearRect(0, 0, judgementCanvas.width, judgementCanvas.height);
         }
       }
+      showJudgementSelectPop(false);
       showJudgementTargetPop(true, `${targetName}の名前を書いてください。`);
       showJudgementWritePop(judgementHasStroke);
     } else {
+      showJudgementSelectPop(isActiveKira);
       showJudgementTargetPop(false);
       showJudgementWritePop(false);
       judgementHasStroke = false;
     }
   } else {
+    showJudgementSelectPop(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     judgementHasStroke = false;
@@ -4929,6 +4956,7 @@ function syncJudgementUI(){
     }
     setJudgementFade(false);
     showJudgementMessage(false);
+    showJudgementSelectPop(false);
     showJudgementTargetPop(false);
     showJudgementWritePop(false);
     if (judgementCanvas && j.noteImage){
@@ -6867,6 +6895,7 @@ function renderPlayerCircle(players){
     const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
     const isJudgementWriting = !!(j?.active && j.phase === 'writing' && j.kiraId === state.userId);
     const canPickJudgementTarget = isJudgementSelecting && p.id !== state.userId && !eliminated;
+    const shouldBoostJudgementPulse = isJudgementSelecting && !!j?.kiraHasZero;
     if ((isJudgementSelecting || isJudgementWriting) && p.id === state.userId){
       tag.classList.add('judgement-self-hidden');
     }
@@ -7013,6 +7042,7 @@ function renderPlayerCircle(players){
       if (canPickJudgementTarget){
         const pickCard = document.createElement('div');
         pickCard.className = 'judgement-pick-card';
+        if (shouldBoostJudgementPulse) pickCard.classList.add('boosted');
         pickCard.title = '正体カード（裏）';
         if (kiraCanSeeFollower){
           applyIdentityCardFace(pickCard, handData?.identity || '');
@@ -7102,6 +7132,7 @@ function renderPlayerCircle(players){
         if (canPickJudgementTarget){
           const pickCard = document.createElement('div');
           pickCard.className = 'judgement-pick-card';
+          if (shouldBoostJudgementPulse) pickCard.classList.add('boosted');
           pickCard.title = '正体カード（裏）';
           if (kiraCanSeeFollower){
             applyIdentityCardFace(pickCard, handData?.identity || '');
@@ -7135,6 +7166,7 @@ function renderPlayerCircle(players){
         if (canPickJudgementTarget){
           const pickCard = document.createElement('div');
           pickCard.className = 'judgement-pick-card';
+          if (shouldBoostJudgementPulse) pickCard.classList.add('boosted');
           pickCard.title = '正体カード（裏）';
           if (kiraCanSeeFollower){
             applyIdentityCardFace(pickCard, handData?.identity || '');
@@ -7172,6 +7204,7 @@ function renderPlayerCircle(players){
         if (canPickJudgementTarget){
           const pickCard = document.createElement('div');
           pickCard.className = 'judgement-pick-card';
+          if (shouldBoostJudgementPulse) pickCard.classList.add('boosted');
           pickCard.title = '正体カード（裏）';
           if (kiraCanSeeFollower){
             applyIdentityCardFace(pickCard, handData?.identity || '');
@@ -7209,6 +7242,7 @@ function renderPlayerCircle(players){
           if (canPickJudgementTarget){
             const pickCard = document.createElement('div');
             pickCard.className = 'judgement-pick-card';
+            if (shouldBoostJudgementPulse) pickCard.classList.add('boosted');
             pickCard.title = '正体カード（裏）';
             if (kiraCanSeeFollower){
               applyIdentityCardFace(pickCard, handData?.identity || '');
@@ -7239,6 +7273,7 @@ function renderPlayerCircle(players){
       if (canPickJudgementTarget){
         const pickCard = document.createElement('div');
         pickCard.className = 'judgement-pick-card';
+        if (shouldBoostJudgementPulse) pickCard.classList.add('boosted');
         pickCard.title = '正体カード（裏）';
         if (kiraCanSeeFollower){
           applyIdentityCardFace(pickCard, handData?.identity || '');
