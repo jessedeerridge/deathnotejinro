@@ -1015,16 +1015,10 @@
     border:none;
   }
 
-  @keyframes judgementTagPulse{
-    0%{ transform:scale(1); }
-    50%{ transform:scale(1.12); }
-    100%{ transform:scale(1); }
-  }
-  .player-tag.judgement-targetable{
-    cursor:pointer;
-  }
-  .player-tag.judgement-targetable .player-label{
-    animation: judgementTagPulse 820ms ease-in-out infinite;
+  @keyframes judgementPickPulse{
+    0%  { transform:translate(-50%,0) scale(0.96); }
+    50% { transform:translate(-50%,0) scale(1.12); }
+    100%{ transform:translate(-50%,0) scale(0.96); }
   }
   .player-tag.judgement-self-hidden{
     opacity:0;
@@ -1536,6 +1530,44 @@
     pointer-events:auto;
     box-shadow:0 0 0 2px rgba(17,17,17,.14), 0 2px 8px rgba(0,0,0,.18);
   }
+  /* ★ 裁き：対象選択用の正体カード（裏） */
+  .judgement-pick-card{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.22);
+    background-image:url('dnroleura.jpg');
+    background-size:cover;
+    background-position:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    animation: judgementPickPulse 760ms ease-in-out infinite;
+    z-index:31;
+    cursor:pointer;
+    pointer-events:auto;
+  }
+  .player-tag .judgement-pick-card{
+    margin-left:-40px;
+  }
+  /* ★ 裁き後：信者/キラの正体カード常時表示 */
+  .revealed-identity-card{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.45);
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    z-index:29;
+    pointer-events:none;
+  }
+  .player-tag .revealed-identity-card{
+    margin-left:-40px;
+  }
   .player-tag.arrest-selected{
     box-shadow:none;
   }
@@ -1590,7 +1622,7 @@
     display:flex;
     flex-direction:column;
     gap:4px;
-    z-index:120;
+    z-index:200;
     pointer-events:none;
   }
   .vote7-result-tag{
@@ -1602,7 +1634,7 @@
     border-radius:999px;
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
-    z-index:121;
+    z-index:201;
   }
 
   /* ★ 9：尋問 方向選択ボタン */
@@ -1658,7 +1690,7 @@
     100%{ transform:scale(0.96); }
   }
   .player-tag.vote7-active{
-    z-index:120;
+    z-index:200;
   }
 </style>
 </head>
@@ -4574,14 +4606,32 @@ function openJudgementNotebook(enableDraw){
   judgementNotebook.classList.remove('hidden');
   judgementNotebook.classList.add('open');
   if (judgementCanvas){
-    const width = judgementNotebook.clientWidth;
-    const height = judgementNotebook.clientHeight;
-    judgementCanvas.width = Math.round(width);
-    judgementCanvas.height = Math.round(height);
-    judgementCanvas.style.left = '0px';
-    judgementCanvas.style.top = '0px';
-    judgementCanvas.style.width = `${width}px`;
-    judgementCanvas.style.height = `${height}px`;
+    const pages = Array.from(judgementNotebook.querySelectorAll('.judgement-page'));
+    const noteRect = judgementNotebook.getBoundingClientRect();
+    if (pages.length){
+      const rects = pages.map((page) => page.getBoundingClientRect());
+      const minLeft = Math.min(...rects.map(r => r.left));
+      const minTop = Math.min(...rects.map(r => r.top));
+      const maxRight = Math.max(...rects.map(r => r.right));
+      const maxBottom = Math.max(...rects.map(r => r.bottom));
+      const width = maxRight - minLeft;
+      const height = maxBottom - minTop;
+      judgementCanvas.width = Math.round(width);
+      judgementCanvas.height = Math.round(height);
+      judgementCanvas.style.left = `${minLeft - noteRect.left}px`;
+      judgementCanvas.style.top = `${minTop - noteRect.top}px`;
+      judgementCanvas.style.width = `${width}px`;
+      judgementCanvas.style.height = `${height}px`;
+    } else {
+      const width = judgementNotebook.clientWidth;
+      const height = judgementNotebook.clientHeight;
+      judgementCanvas.width = Math.round(width);
+      judgementCanvas.height = Math.round(height);
+      judgementCanvas.style.left = '0px';
+      judgementCanvas.style.top = '0px';
+      judgementCanvas.style.width = `${width}px`;
+      judgementCanvas.style.height = `${height}px`;
+    }
     judgementCanvas.style.pointerEvents = enableDraw ? 'auto' : 'none';
   }
   judgementDrawActive = !!enableDraw;
@@ -6612,17 +6662,14 @@ function renderPlayerCircle(players){
     }
 
     const eliminated = isEliminated(p.id);
+    const myIdentity = getMyIdentity();
+    const judgementRevealed = Number(state.room?.judgementMeta?.lastRound || 0) >= 2;
     const j = getJudgement();
     const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
     const isJudgementWriting = !!(j?.active && j.phase === 'writing' && j.kiraId === state.userId);
+    const canPickJudgementTarget = isJudgementSelecting && p.id !== state.userId && !eliminated;
     if ((isJudgementSelecting || isJudgementWriting) && p.id === state.userId){
       tag.classList.add('judgement-self-hidden');
-    }
-    if (isJudgementSelecting && p.id !== state.userId && !eliminated){
-      tag.classList.add('judgement-targetable');
-      tag.addEventListener('click', async () => {
-        await pickJudgementTarget(p.id);
-      });
     }
 
     /* ★ 5（証人）：対象選択（使用者だけ）
@@ -6653,6 +6700,10 @@ function renderPlayerCircle(players){
     const eliminatedRecord = state.eliminated?.[p.id];
     const eliminatedIdentity = eliminatedRecord?.identity || handData?.identity || '？';
     const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
+    const shouldRevealIdentity = judgementRevealed && (
+      (myIdentity === 'キラ' && handData?.identity === '信者')
+      || (myIdentity === '信者' && handData?.identity === 'キラ')
+    );
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     const showAliasReveal = !!(state.alias3Event && state.alias3Event.targetId === p.id);
@@ -6743,6 +6794,24 @@ function renderPlayerCircle(players){
         }
       }
 
+      if (shouldRevealIdentity && p.id !== state.userId){
+        const revealCard = document.createElement('div');
+        revealCard.className = 'revealed-identity-card';
+        applyIdentityCardFace(revealCard, handData?.identity || '');
+        miniHand.appendChild(revealCard);
+      }
+
+      if (canPickJudgementTarget){
+        const pickCard = document.createElement('div');
+        pickCard.className = 'judgement-pick-card';
+        pickCard.title = '正体カード（裏）';
+        pickCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickJudgementTarget(p.id);
+        });
+        miniHand.appendChild(pickCard);
+      }
+
       const count = displayHandCards.length;
       const spread = 70;
       const base = (count > 1) ? (-spread/2) : 0;
@@ -6797,7 +6866,7 @@ function renderPlayerCircle(players){
 
       tag.appendChild(miniHand);
     } else {
-      // 扇手札が無いケースでも、5の選択UIだけは出す
+      // 扇手札が無いケースでも、選択UIだけは出す
       if (iAmWitnessBy && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
@@ -6812,6 +6881,22 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
+        if (shouldRevealIdentity && p.id !== state.userId){
+          const revealCard = document.createElement('div');
+          revealCard.className = 'revealed-identity-card';
+          applyIdentityCardFace(revealCard, handData?.identity || '');
+          miniHand.appendChild(revealCard);
+        }
+        if (canPickJudgementTarget){
+          const pickCard = document.createElement('div');
+          pickCard.className = 'judgement-pick-card';
+          pickCard.title = '正体カード（裏）';
+          pickCard.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickJudgementTarget(p.id);
+          });
+          miniHand.appendChild(pickCard);
+        }
         tag.appendChild(miniHand);
       } else if (isArrestByMe && p.id !== state.userId && !eliminated){
         const miniHand = document.createElement('div');
@@ -6826,6 +6911,22 @@ function renderPlayerCircle(players){
           await pickArrest1Target(p.id);
         });
         miniHand.appendChild(arrestCard);
+        if (shouldRevealIdentity && p.id !== state.userId){
+          const revealCard = document.createElement('div');
+          revealCard.className = 'revealed-identity-card';
+          applyIdentityCardFace(revealCard, handData?.identity || '');
+          miniHand.appendChild(revealCard);
+        }
+        if (canPickJudgementTarget){
+          const pickCard = document.createElement('div');
+          pickCard.className = 'judgement-pick-card';
+          pickCard.title = '正体カード（裏）';
+          pickCard.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickJudgementTarget(p.id);
+          });
+          miniHand.appendChild(pickCard);
+        }
         tag.appendChild(miniHand);
       } else if (eliminated && !eliminatedDiscardedAt && p.id !== state.userId){
         const miniHand = document.createElement('div');
@@ -6844,6 +6945,22 @@ function renderPlayerCircle(players){
         const miniCircle = document.createElement('div');
         miniCircle.className = 'mini-hand-circle';
         miniHand.appendChild(miniCircle);
+        if (shouldRevealIdentity && p.id !== state.userId){
+          const revealCard = document.createElement('div');
+          revealCard.className = 'revealed-identity-card';
+          applyIdentityCardFace(revealCard, handData?.identity || '');
+          miniHand.appendChild(revealCard);
+        }
+        if (canPickJudgementTarget){
+          const pickCard = document.createElement('div');
+          pickCard.className = 'judgement-pick-card';
+          pickCard.title = '正体カード（裏）';
+          pickCard.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickJudgementTarget(p.id);
+          });
+          miniHand.appendChild(pickCard);
+        }
         tag.appendChild(miniHand);
       } else {
         // 他人側：対象だけ裏を表示
@@ -6862,9 +6979,50 @@ function renderPlayerCircle(players){
           idBack.style.cursor = 'default';
           idBack.style.pointerEvents = 'none';
           miniHand.appendChild(idBack);
+          if (shouldRevealIdentity && p.id !== state.userId){
+            const revealCard = document.createElement('div');
+            revealCard.className = 'revealed-identity-card';
+            applyIdentityCardFace(revealCard, handData?.identity || '');
+            miniHand.appendChild(revealCard);
+          }
+          if (canPickJudgementTarget){
+            const pickCard = document.createElement('div');
+            pickCard.className = 'judgement-pick-card';
+            pickCard.title = '正体カード（裏）';
+            pickCard.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              await pickJudgementTarget(p.id);
+            });
+            miniHand.appendChild(pickCard);
+          }
           tag.appendChild(miniHand);
         }
       }
+    }
+
+    if ((shouldRevealIdentity || canPickJudgementTarget) && p.id !== state.userId && !tag.querySelector('.mini-hand')){
+      const miniHand = document.createElement('div');
+      miniHand.className = 'mini-hand';
+      const miniCircle = document.createElement('div');
+      miniCircle.className = 'mini-hand-circle';
+      miniHand.appendChild(miniCircle);
+      if (shouldRevealIdentity){
+        const revealCard = document.createElement('div');
+        revealCard.className = 'revealed-identity-card';
+        applyIdentityCardFace(revealCard, handData?.identity || '');
+        miniHand.appendChild(revealCard);
+      }
+      if (canPickJudgementTarget){
+        const pickCard = document.createElement('div');
+        pickCard.className = 'judgement-pick-card';
+        pickCard.title = '正体カード（裏）';
+        pickCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickJudgementTarget(p.id);
+        });
+        miniHand.appendChild(pickCard);
+      }
+      tag.appendChild(miniHand);
     }
 
     playerCircle.appendChild(tag);
