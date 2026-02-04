@@ -78,6 +78,10 @@
   }
   .player-tag.me .player-label{ background:#111;color:#fff;border-color:#111; }
   .player-tag .player-name{ display:inline-block; }
+  .player-tag.kick-targetable .player-label{
+    cursor:pointer;
+    box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
 
   .center-area{
     position:absolute;
@@ -1186,6 +1190,10 @@
     box-shadow:0 18px 40px rgba(0,0,0,.35);
     max-width:340px;width:calc(100% - 40px);
   }
+  #kickDialogBox{
+    border:1px solid #111;
+    color:#111;
+  }
   .dialog-box p{margin:0 0 12px;font-size:14px;line-height:1.6;}
   .dialog-buttons{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
 
@@ -1946,6 +1954,7 @@ const kickDialog = document.getElementById('kickDialog');
 const kickMessage = document.getElementById('kickMessage');
 const btnKickYes = document.getElementById('btnKickYes');
 const btnKickNo = document.getElementById('btnKickNo');
+let pendingKickTarget = null;
 
 const dirChoice = document.getElementById('dirChoice');
 const btnDirLeft = document.getElementById('btnDirLeft');
@@ -6258,7 +6267,167 @@ async function renderSeatTabs(){
   }
 }
 
+function openKickDialog(target){
+  if (!kickDialog) return;
+  pendingKickTarget = target || null;
+  const name = target?.name || 'プレイヤー';
+  if (kickMessage){
+    kickMessage.textContent = `「${name}」を追い出して、着席しますか？`;
+  }
+  kickDialog.classList.remove('hidden');
+  kickDialog.setAttribute('aria-hidden', 'false');
+}
+
+function closeKickDialog(){
+  pendingKickTarget = null;
+  if (!kickDialog) return;
+  kickDialog.classList.add('hidden');
+  kickDialog.setAttribute('aria-hidden', 'true');
+}
+
+async function takeOverSeatFromPlayer(target){
+  if (!state.roomCode || !target?.id || !Number.isFinite(Number(target?.seatIndex))) return;
+  if (state.seatedTable !== null) return;
+
+  const oldId = target.id;
+  const newId = state.userId;
+  if (oldId === newId) return;
+  const base = `rooms/${state.roomCode}`;
+
+  const [handSnap, eliminatedSnap, aliasSnap] = await Promise.all([
+    get(ref(db, `${base}/hands/${oldId}`)),
+    get(ref(db, `${base}/eliminated/${oldId}`)),
+    get(ref(db, `${base}/alias3Used/${oldId}`))
+  ]);
+  const handData = handSnap.val() || null;
+  const eliminatedData = eliminatedSnap.val() || null;
+  const aliasData = aliasSnap.val() || null;
+
+  const updates = {};
+  updates[`${base}/tables/${target.seatIndex}`] = { playerId: newId, playerName: state.userName };
+  updates[`${base}/hands/${newId}`] = handData;
+  updates[`${base}/hands/${oldId}`] = null;
+  updates[`${base}/eliminated/${newId}`] = eliminatedData;
+  updates[`${base}/eliminated/${oldId}`] = null;
+  updates[`${base}/alias3Used/${newId}`] = aliasData;
+  updates[`${base}/alias3Used/${oldId}`] = null;
+
+  if (state.turn?.currentPlayerId === oldId){
+    updates[`${base}/turn/currentPlayerId`] = newId;
+  }
+
+  const inv = state.investigation;
+  if (inv?.by === oldId){
+    updates[`${base}/investigation/by`] = newId;
+  }
+  if (inv?.selections?.[oldId]){
+    updates[`${base}/investigation/selections/${newId}`] = inv.selections[oldId];
+    updates[`${base}/investigation/selections/${oldId}`] = null;
+  }
+
+  const ex = state.exchange8;
+  if (ex?.by === oldId){
+    updates[`${base}/exchange8/by`] = newId;
+  }
+  if (ex?.targetId === oldId){
+    updates[`${base}/exchange8/targetId`] = newId;
+  }
+
+  const watch = state.surveillance6;
+  if (watch?.by === oldId){
+    updates[`${base}/surveillance6/by`] = newId;
+  }
+  if (watch?.targetId === oldId){
+    updates[`${base}/surveillance6/targetId`] = newId;
+  }
+
+  const witness = state.witness5;
+  if (witness?.by === oldId){
+    updates[`${base}/witness5/by`] = newId;
+  }
+  if (witness?.targetId === oldId){
+    updates[`${base}/witness5/targetId`] = newId;
+  }
+
+  const votes = state.vote7?.votes;
+  if (votes && typeof votes === 'object'){
+    const nextVotes = { ...votes };
+    let changed = false;
+    if (Object.prototype.hasOwnProperty.call(nextVotes, oldId)){
+      nextVotes[newId] = nextVotes[oldId];
+      delete nextVotes[oldId];
+      changed = true;
+    }
+    for (const [voterId, targetId] of Object.entries(nextVotes)){
+      if (targetId === oldId){
+        nextVotes[voterId] = newId;
+        changed = true;
+      }
+    }
+    if (changed){
+      updates[`${base}/vote7/votes`] = nextVotes;
+    }
+  }
+
+  const sh = state.shinigami13;
+  if (sh?.by === oldId){
+    updates[`${base}/shinigami13/by`] = newId;
+  }
+  if (sh?.targetId === oldId){
+    updates[`${base}/shinigami13/targetId`] = newId;
+  }
+
+  const gun2 = state.gun2;
+  if (gun2?.by === oldId){
+    updates[`${base}/gun2/by`] = newId;
+  }
+  if (gun2?.targetId === oldId){
+    updates[`${base}/gun2/targetId`] = newId;
+  }
+
+  const judgement = state.judgement;
+  if (judgement?.kiraId === oldId){
+    updates[`${base}/judgement/kiraId`] = newId;
+  }
+  if (judgement?.targetId === oldId){
+    updates[`${base}/judgement/targetId`] = newId;
+  }
+
+  const arrest = state.arrest1;
+  if (arrest?.by === oldId){
+    updates[`${base}/arrest1/by`] = newId;
+  }
+  if (arrest?.targetId === oldId){
+    updates[`${base}/arrest1/targetId`] = newId;
+  }
+
+  const reveal = state.reveal011;
+  if (reveal?.by === oldId){
+    updates[`${base}/reveal011/by`] = newId;
+  }
+
+  const aliasEv = state.alias3Event;
+  if (aliasEv?.targetId === oldId){
+    updates[`${base}/alias3Event/targetId`] = newId;
+  }
+
+  await update(ref(db, `/`), updates);
+  state.seatedTable = target.seatIndex;
+  seatPop.classList.add('hidden');
+}
+
 btnSeatCancel.onclick = () => { seatPop.classList.add('hidden'); state.seatedTable = null; };
+btnKickNo?.addEventListener('click', (e) => {
+  e.preventDefault();
+  closeKickDialog();
+});
+btnKickYes?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!pendingKickTarget) return;
+  const target = pendingKickTarget;
+  closeKickDialog();
+  await takeOverSeatFromPlayer(target);
+});
 
 function subscribePlayers(){
   const tablesRef = ref(db, `rooms/${state.roomCode}/tables`);
@@ -6379,6 +6548,16 @@ function renderPlayerCircle(players){
     nameSpan.textContent = p.name;
     labelSpan.appendChild(nameSpan);
     tag.appendChild(labelSpan);
+
+    const canTakeSeat = state.seatedTable === null && p.id !== state.userId;
+    if (canTakeSeat){
+      tag.classList.add('kick-targetable');
+      tag.addEventListener('click', (e) => {
+        if (state.seatedTable !== null) return;
+        e.stopPropagation();
+        openKickDialog(p);
+      });
+    }
 
     if (vActive){
       tag.classList.add('vote7-active');
