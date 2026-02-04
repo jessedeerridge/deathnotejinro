@@ -337,6 +337,8 @@
   }
   .player-tag.exchange-selected{
     outline:none !important;
+  }
+  .player-tag.exchange-selected .player-label{
     box-shadow:0 0 0 2px rgba(17,17,17,.10);
   }
 
@@ -352,12 +354,12 @@
   }
   .player-tag.me.waiting-pick{
     animation: tagPulse 900ms ease-in-out infinite;
-    outline:2px dashed rgba(17,17,17,.25);
-    outline-offset:2px;
   }
-  .player-tag.picked{
-    outline:2px solid #111;
-    outline-offset:2px;
+  .player-tag.me.waiting-pick .player-label{
+    border:2px dashed rgba(17,17,17,.25);
+  }
+  .player-tag.picked .player-label{
+    border:2px solid #111;
   }
 
   /* ★ 8：交換フェーズ（対象選択中）miniをパルス */
@@ -372,6 +374,8 @@
   .player-tag.exchange-targetable{
     cursor:pointer;
     outline:none !important;
+  }
+  .player-tag.exchange-targetable .player-label{
     box-shadow:0 0 0 2px rgba(17,17,17,.10);
   }
   .player-tag.exchange-targetable .mini-hand{ pointer-events:auto; }
@@ -391,6 +395,8 @@
   }
   .player-tag.watch6-targetable{
     cursor:pointer;
+  }
+  .player-tag.watch6-targetable .player-label{
     box-shadow:0 0 0 2px rgba(17,17,17,.10);
   }
   .player-tag.watch6-targetable .mini-hand{ pointer-events:auto; }
@@ -409,6 +415,8 @@
   }
   .player-tag.gun2-targetable{
     cursor:pointer;
+  }
+  .player-tag.gun2-targetable .player-label{
     box-shadow:0 0 0 2px rgba(17,17,17,.10);
   }
   .player-tag.gun2-targetable .mini-hand{ pointer-events:auto; }
@@ -1370,19 +1378,6 @@
   }
   .pick-pop.hidden{display:none;}
 
-  .exchange-pop{
-    position:fixed;
-    left:50%; top:70px;
-    transform:translateX(-50%);
-    background:rgba(20,20,20,.92);color:#fff;
-    padding:10px 12px;border-radius:14px;
-    box-shadow:0 18px 40px rgba(0,0,0,.35);
-    z-index:66;
-    font-weight:900;
-    white-space:nowrap;
-    pointer-events:none;
-  }
-  .exchange-pop.hidden{display:none;}
   .exchange-return-pop{
     position:fixed;
     left:50%;
@@ -1444,13 +1439,17 @@
     box-shadow:0 0 0 2px rgba(17,17,17,.14), 0 2px 8px rgba(0,0,0,.18);
   }
   .player-tag.arrest-selected{
+    box-shadow:none;
+  }
+  .player-tag.arrest-selected .player-label{
     box-shadow:0 0 0 2px rgba(17,17,17,.2);
   }
 
   /* ★ 7：投票 */
   .vote-pop{
     position:fixed;
-    left:50%; top:70px;
+    left:50%;
+    bottom:14px;
     transform:translateX(-50%);
     background:rgba(20,20,20,.92);
     color:#fff;
@@ -1463,22 +1462,6 @@
     border:1px solid rgba(255,255,255,.08);
   }
   .vote-pop.hidden{display:none;}
-  .vote7-instruction{
-    position:absolute;
-    left:50%;
-    top:100%;
-    transform:translate(-50%,6px);
-    padding:4px 8px;
-    border-radius:999px;
-    background:rgba(17,17,17,.9);
-    color:#fff;
-    font-size:11px;
-    font-weight:700;
-    white-space:nowrap;
-    pointer-events:none;
-    box-shadow:0 10px 24px rgba(0,0,0,.2);
-    z-index:52;
-  }
 
   /* ★ 7：投票タグアニメ */
   @keyframes voteTagPulse{
@@ -1488,6 +1471,8 @@
   }
   .player-tag.vote7-targetable{
     cursor:pointer;
+  }
+  .player-tag.vote7-targetable .player-label{
     box-shadow:0 0 0 2px rgba(17,17,17,.12);
   }
   .player-tag.vote7-targetable .player-label{
@@ -1520,6 +1505,58 @@
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
     z-index:61;
+  }
+
+  /* ★ 9：尋問 方向選択ボタン */
+  .dir-choice{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:110px;
+    display:flex;
+    justify-content:space-between;
+    padding:0 18px;
+    z-index:70;
+    pointer-events:none;
+  }
+  .dir-choice.hidden{display:none;}
+  .dir-choice-btn{
+    width:64px;
+    height:64px;
+    border-radius:18px;
+    border:2px solid rgba(17,17,17,.25);
+    background:#111;
+    color:#fff;
+    font-size:28px;
+    font-weight:900;
+    box-shadow:0 12px 24px rgba(0,0,0,.22);
+    pointer-events:auto;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    animation: dirChoicePulse 900ms ease-in-out infinite;
+  }
+  .dir-choice-btn:disabled{
+    cursor:default;
+    opacity:.7;
+  }
+  .dir-choice.selected-left .dir-choice-btn.right,
+  .dir-choice.selected-right .dir-choice-btn.left{
+    background:#d4d4d4;
+    color:#7c7c7c;
+    border-color:#c4c4c4;
+    box-shadow:none;
+    animation:none;
+  }
+  .dir-choice.selected-left .dir-choice-btn.left,
+  .dir-choice.selected-right .dir-choice-btn.right{
+    animation: dirChoicePulse 720ms ease-in-out infinite;
+  }
+  @keyframes dirChoicePulse{
+    0%{ transform:scale(0.96); }
+    50%{ transform:scale(1.12); }
+    100%{ transform:scale(0.96); }
   }
   .player-tag.vote7-active{
     z-index:20;
@@ -1670,7 +1707,6 @@
 
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
-<div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
 <div id="exchangeReturnPop" class="exchange-return-pop hidden">手札から渡したいカードを選んでください。</div>
 <div id="witnessPop" class="witness-pop hidden">5の効果：正体カード（裏）をクリックして対象選択</div>
 <div id="votePop" class="vote-pop hidden">7の効果：投票するプレイヤーを選択</div>
@@ -1692,14 +1728,9 @@
   </div>
 </div>
 
-<div id="dirDialog" class="dialog-backdrop hidden">
-  <div class="dialog-box">
-    <p id="dirMessage"><b>9（尋問）</b>：渡す方向を選択</p>
-    <div class="dialog-buttons">
-      <button class="btn ghost" id="btnDirLeft">左（次の手番へ）</button>
-      <button class="btn primary" id="btnDirRight">右（前の手番へ）</button>
-    </div>
-  </div>
+<div id="dirChoice" class="dir-choice hidden" aria-hidden="true">
+  <button class="dir-choice-btn left" id="btnDirLeft" aria-label="左を選択">◀</button>
+  <button class="dir-choice-btn right" id="btnDirRight" aria-label="右を選択">▶</button>
 </div>
 
 <button id="hostSettingsBtn" class="host-settings-btn" title="設定">⚙</button>
@@ -1766,11 +1797,12 @@ sessionStorage.setItem('bbUserId', savedUserId);
 
 const DRAW_COMMIT_DELAY_MS = 620;
 const RESHUFFLE_ANIM_MS = 980;
-const TRANSFER_ANIM_MS = 620;
+const TRANSFER_ANIM_MS = 720;
 const EXCHANGE_ANIM_MS = 620;
 const EXCHANGE_WAIT_BEFORE_MOVE_MS = 1000;
 const REVEAL011_MOVE_MS = 520;
 const REVEAL011_SHUFFLE_MS = 560;
+let localDirChoice = null;
 
 /* ★ 6（監視） */
 const WATCH6_MAX_AGE_MS = 60000;
@@ -1820,7 +1852,6 @@ const copyLinkBtn = document.getElementById('copyLinkBtn');
 
 const hostSelectingPop = document.getElementById('hostSelectingPop');
 const pickPop = document.getElementById('pickPop');
-const exchangePop = document.getElementById('exchangePop');
 const exchangeReturnPop = document.getElementById('exchangeReturnPop');
 const witnessPop = document.getElementById('witnessPop');
 const votePop = document.getElementById('votePop');
@@ -1850,7 +1881,7 @@ const kickMessage = document.getElementById('kickMessage');
 const btnKickYes = document.getElementById('btnKickYes');
 const btnKickNo = document.getElementById('btnKickNo');
 
-const dirDialog = document.getElementById('dirDialog');
+const dirChoice = document.getElementById('dirChoice');
 const btnDirLeft = document.getElementById('btnDirLeft');
 const btnDirRight = document.getElementById('btnDirRight');
 
@@ -2651,34 +2682,28 @@ function updateTurnUI(){
   // 8 pop
   const exActive = isExchangeActive();
   if (!exActive){
-    exchangePop.classList.add('hidden');
     exchangeReturnPop.classList.add('hidden');
   } else {
     const ex = state.exchange8;
     const isBy = ex?.by === state.userId;
     const isTarget = ex?.targetId === state.userId;
-    let showTopPop = true;
     exchangeReturnPop.classList.add('hidden');
     if (ex?.phase === 'pickTarget'){
-      exchangePop.textContent = '8の効果：対象プレイヤーを選択';
+      if (isBy){
+        exchangeReturnPop.textContent = '8の効果：対象プレイヤーを選択';
+        exchangeReturnPop.classList.remove('hidden');
+      }
     } else if (ex?.phase === 'targetPickMin'){
-      showTopPop = false;
       if (isTarget){
         exchangeReturnPop.textContent = '小さいほうのカードを選んで、相手に渡してください。';
         exchangeReturnPop.classList.remove('hidden');
       }
     } else if (ex?.phase === 'byPickReturn'){
       if (isBy){
-        showTopPop = false;
         exchangeReturnPop.textContent = '手札から渡したいカードを選んでください。';
         exchangeReturnPop.classList.remove('hidden');
-      } else {
-        showTopPop = false;
       }
-    } else {
-      exchangePop.textContent = '8の効果：処理中';
     }
-    exchangePop.classList.toggle('hidden', !showTopPop);
   }
 
   // 5 pop
@@ -2689,17 +2714,35 @@ function updateTurnUI(){
 
   // 7 pop
   const vActive = isVote7Active();
-  if (!vActive){
+  const vVoting = isVote7Voting();
+  if (!vActive || !vVoting){
     votePop.classList.add('hidden');
   } else {
-    votePop.classList.add('hidden');
+    votePop.textContent = 'キラだと思う人を選んでください。';
+    votePop.classList.remove('hidden');
   }
 
-  // 9 dir dialog
+  // 9 dir buttons
   if (isInvChoosingDir() && state.investigation?.by === state.userId){
-    dirDialog.classList.remove('hidden');
+    dirChoice.classList.remove('hidden');
+    const hasChoice = !!localDirChoice;
+    btnDirLeft.disabled = hasChoice;
+    btnDirRight.disabled = hasChoice;
+    if (localDirChoice === 'left'){
+      dirChoice.classList.add('selected-left');
+      dirChoice.classList.remove('selected-right');
+    } else if (localDirChoice === 'right'){
+      dirChoice.classList.add('selected-right');
+      dirChoice.classList.remove('selected-left');
+    } else {
+      dirChoice.classList.remove('selected-left', 'selected-right');
+    }
   } else {
-    dirDialog.classList.add('hidden');
+    localDirChoice = null;
+    dirChoice.classList.add('hidden');
+    dirChoice.classList.remove('selected-left', 'selected-right');
+    btnDirLeft.disabled = false;
+    btnDirRight.disabled = false;
   }
 
   updateTurnHandEmphasisOnTags();
@@ -3483,8 +3526,22 @@ async function setInvestigationDir(dir){
   });
 }
 
-btnDirLeft.addEventListener('click', async () => { await setInvestigationDir('left'); });
-btnDirRight.addEventListener('click', async () => { await setInvestigationDir('right'); });
+btnDirLeft.addEventListener('click', async () => {
+  localDirChoice = 'left';
+  dirChoice.classList.add('selected-left');
+  dirChoice.classList.remove('selected-right');
+  btnDirLeft.disabled = true;
+  btnDirRight.disabled = true;
+  await setInvestigationDir('left');
+});
+btnDirRight.addEventListener('click', async () => {
+  localDirChoice = 'right';
+  dirChoice.classList.add('selected-right');
+  dirChoice.classList.remove('selected-left');
+  btnDirLeft.disabled = true;
+  btnDirRight.disabled = true;
+  await setInvestigationDir('right');
+});
 
 /* =========================
    8（交換）
@@ -5663,13 +5720,13 @@ async function animateTransferPairs(pairs){
   await sleep(20);
 
   flyers.forEach(({el,to,i}) => {
-    el.style.transition = 'left 520ms ease, top 520ms ease, transform 520ms ease, opacity 160ms ease';
+    el.style.transition = 'left 620ms ease, top 620ms ease, transform 620ms ease, opacity 180ms ease';
     el.style.left = `${to.x}px`;
     el.style.top  = `${to.y}px`;
     el.style.transform = `translate(-50%,-50%) rotate(${(i%2?12:-12)}deg) scale(1.10)`;
   });
 
-  await sleep(560);
+  await sleep(660);
 
   flyers.forEach(({el}) => {
     el.style.opacity = '0';
@@ -6210,13 +6267,6 @@ function renderPlayerCircle(players){
 
     if (vActive){
       tag.classList.add('vote7-active');
-    }
-
-    if (vActive && vPhase === 'voting'){
-      const instruction = document.createElement('div');
-      instruction.className = 'vote7-instruction';
-      instruction.textContent = 'キラだと思う人を選んでください。';
-      tag.appendChild(instruction);
     }
 
     if (reveal011TargetId && p.id === reveal011TargetId && p.id !== state.userId){
