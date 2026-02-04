@@ -1250,23 +1250,19 @@
   width:100%;
   border:1px solid rgba(255,255,255,.7);
   border-radius:3px;
-  aspect-ratio:5 / 2.3;
+  aspect-ratio:5 / 2.9;
   display:flex;
   align-items:center;
   justify-content:center;
-
-  /* ★効果枠の中身の上下を詰める */
+  flex:0 0 auto;
+  overflow:hidden;
+  word-break:break-word;
   padding:1px;
-
   text-align:center;
   font-size:8px;
   line-height:1.15;
-
-  /* ★必要なら少し上げる */
   margin-top:0px;
 }
-
-
   .card-face.mini{
     gap:2px;
     padding:3px;
@@ -1869,9 +1865,49 @@ function buildCardFace(cardId, { size = '' } = {}){
   return face;
 }
 
+function fitCardEffectText(effectEl, attempt = 0){
+  if (!effectEl) return;
+  if (effectEl.clientWidth === 0 || effectEl.clientHeight === 0){
+    if (attempt < 3){
+      requestAnimationFrame(() => fitCardEffectText(effectEl, attempt + 1));
+    }
+    return;
+  }
+
+  const face = effectEl.closest('.card-face');
+  const isMini = face?.classList.contains('mini');
+  const maxSize = isMini ? 6 : 8;
+  const minSize = isMini ? 4 : 5;
+  let fontSize = maxSize;
+  effectEl.style.fontSize = `${fontSize}px`;
+
+  const maxIterations = 20;
+  for (let i = 0; i < maxIterations; i += 1){
+    const fitsHeight = effectEl.scrollHeight <= effectEl.clientHeight;
+    const fitsWidth = effectEl.scrollWidth <= effectEl.clientWidth;
+    if (fitsHeight && fitsWidth) break;
+    if (fontSize <= minSize) break;
+    fontSize = Math.max(minSize, fontSize - 0.5);
+    effectEl.style.fontSize = `${fontSize}px`;
+  }
+}
+
+function scheduleFitCardEffect(cardEl){
+  const effectEl = cardEl?.querySelector?.('.card-effect');
+  if (!effectEl) return;
+  requestAnimationFrame(() => fitCardEffectText(effectEl));
+}
+
+function fitAllCardEffects(){
+  document.querySelectorAll('.card-effect').forEach((effectEl) => {
+    fitCardEffectText(effectEl);
+  });
+}
+
 function applyCardFace(cardEl, cardId, { size = '' } = {}){
   cardEl.innerHTML = '';
   cardEl.appendChild(buildCardFace(cardId, { size }));
+  scheduleFitCardEffect(cardEl);
 }
 
 function renderHelpList(){
@@ -1895,6 +1931,9 @@ function closeHelp(){ helpBackdrop.classList.add('hidden'); }
 helpBtn.addEventListener('click', () => { if (joinBox.classList.contains('hidden')) openHelp(); });
 btnHelpClose.addEventListener('click', closeHelp);
 helpBackdrop.addEventListener('click', (e) => { if (e.target === helpBackdrop) closeHelp(); });
+window.addEventListener('resize', () => {
+  requestAnimationFrame(fitAllCardEffects);
+});
 
 let isRenderingSeatTabs = false;
 let latestPlayers = [];
@@ -6316,17 +6355,17 @@ function buildDeckForPlayers(playerCount){
   const deck = [];
 
   if (playerCount <= 4){
-    pushN(deck, 0, 10);
-    pushN(deck, 1, 20);
-    pushN(deck, 2, 0);
-    pushN(deck, 3, 0);
-    pushN(deck, 5, 0);
-    pushN(deck, 4, 0);
-    pushN(deck, 6, 0);
-    pushN(deck, 7, 0);
-    pushN(deck, 8, 0);
-    pushN(deck, 9, 0);
-    pushN(deck, 13, 0);
+    pushN(deck, 0, 1);
+    pushN(deck, 1, 2);
+    pushN(deck, 2, 1);
+    pushN(deck, 3, 1);
+    pushN(deck, 5, 1);
+    pushN(deck, 4, 1);
+    pushN(deck, 6, 1);
+    pushN(deck, 7, 1);
+    pushN(deck, 8, 1);
+    pushN(deck, 9, 1);
+    pushN(deck, 13, 1);
     return deck;
   }
 
