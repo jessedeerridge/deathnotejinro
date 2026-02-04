@@ -2368,6 +2368,10 @@ function isVote7Active(){ return !!state.vote7?.active; }
 function vote7Phase(){ return String(state.vote7?.phase || ''); }
 function isVote7Voting(){ return isVote7Active() && vote7Phase() === 'voting'; }
 function isVote7Revealing(){ return isVote7Active() && vote7Phase() === 'reveal'; }
+function getVote7EligiblePlayers(players){
+  if (!Array.isArray(players)) return [];
+  return players.filter(p => !isEliminated(p.id));
+}
 
 /* ★ 1（逮捕） */
 function isArrestActive(){ return !!state.arrest1?.active; }
@@ -5178,11 +5182,14 @@ async function pickVote7Target(targetId){
   if (!v?.active) return;
   if (v.phase !== 'voting') return;
   const myId = state.userId;
+  if (isEliminated(myId)) return;
   if (!targetId || targetId === myId) return;
+  if (isEliminated(targetId)) return;
   const players = await getSeatedPlayers();
   if (!players.length) return;
   const votes = v.votes || {};
-  const allVoted = players.every(p => votes[p.id]);
+  const eligiblePlayers = getVote7EligiblePlayers(players);
+  const allVoted = eligiblePlayers.length > 0 && eligiblePlayers.every(p => votes[p.id]);
   if (allVoted) return;
 
   await set(ref(db, `rooms/${state.roomCode}/vote7/votes/${myId}`), targetId);
@@ -5200,8 +5207,9 @@ async function maybeResolveVote7(){
   if (!players.length) return;
 
   const votes = v.votes || {};
-  const votedCount = players.filter(p => votes[p.id]).length;
-  if (votedCount !== players.length) return;
+  const eligiblePlayers = getVote7EligiblePlayers(players);
+  const votedCount = eligiblePlayers.filter(p => votes[p.id]).length;
+  if (eligiblePlayers.length === 0 || votedCount !== eligiblePlayers.length) return;
 
   const lockRef = ref(db, `rooms/${state.roomCode}/vote7/resolveLock`);
   const myId = state.userId;
@@ -6514,10 +6522,12 @@ function buildVote7Results(voteData, players){
   if (!voteData || !players?.length) return results;
 
   const votes = voteData?.votes || {};
+  const eligiblePlayers = getVote7EligiblePlayers(players);
+  const voterIds = new Set(eligiblePlayers.map(p => p.id));
   const playerIds = new Set(players.map(p => p.id));
 
   Object.entries(votes).forEach(([voterId, targetId]) => {
-    if (!playerIds.has(voterId)) return;
+    if (!voterIds.has(voterId)) return;
     if (!playerIds.has(targetId)) return;
     if (!results[targetId]) results[targetId] = [];
     results[targetId].push(voterId);
@@ -6569,7 +6579,8 @@ function renderPlayerCircle(players){
   const vPhase = vote7Phase();
   const vVotes = state.vote7?.votes || {};
   const iHaveVoted = !!vVotes[state.userId];
-  const allVoted = vActive && vPhase === 'voting' && players.every(p => vVotes[p.id]);
+  const eligibleVoters = getVote7EligiblePlayers(players);
+  const allVoted = vActive && vPhase === 'voting' && eligibleVoters.length > 0 && eligibleVoters.every(p => vVotes[p.id]);
   const showVotedStatus = vActive && vPhase === 'voting' && iHaveVoted;
   const votePreviewTargetId = (vActive && vPhase === 'voting' && iHaveVoted)
     ? vVotes[state.userId]
@@ -6688,7 +6699,7 @@ function renderPlayerCircle(players){
 
     /* ★ 7（投票）：対象選択（全員） */
     if (vActive && vPhase === 'voting'){
-      if (!allVoted && p.id !== state.userId){
+      if (!allVoted && p.id !== state.userId && !eliminated && !isEliminated(state.userId)){
         tag.classList.add('vote7-targetable');
         tag.addEventListener('click', async () => {
           await pickVote7Target(p.id);
@@ -6696,7 +6707,8 @@ function renderPlayerCircle(players){
       }
       if (showVotedStatus){
         const hasVoted = !!vVotes[p.id];
-        if (hasVoted && p.id !== state.userId) tag.classList.add('vote7-voted');
+        const isEligible = eligibleVoters.some(voter => voter.id === p.id);
+        if (isEligible && hasVoted && p.id !== state.userId) tag.classList.add('vote7-voted');
       }
     }
 
