@@ -88,7 +88,7 @@
     left:50%; top:calc(50% + 17px);    transform:translate(-50%,-50%);
     width:64px; height:64px;
     border-radius:999px;
-    background:rgba(255,255,255,.85);
+    background:transparent;
     border:2px dashed rgba(17,17,17,.35);
     box-shadow:0 10px 22px rgba(0,0,0,.15);
     display:grid; place-items:center;
@@ -100,7 +100,7 @@
   }
   .center-area.active-drop{
     border-color:#111;
-    background:rgba(255,255,255,.95);
+    background:transparent;
     transform:translate(-50%,-50%) scale(1.03);
   }
 
@@ -123,6 +123,7 @@
     box-shadow:0 10px 26px rgba(0,0,0,.18);
     transform:translate(-50%,-50%) translate(40px, 36px) rotate(3deg);
     z-index:10;
+    color:#fff;
     pointer-events:none;
   }
   .card1-spot.hidden{display:none;}
@@ -853,6 +854,7 @@
     position:relative;
     width:170px;
     height:250px;
+    border-radius:12px;
   }
   .arrest-kira-half{
     position:absolute;
@@ -860,13 +862,32 @@
     border-radius:12px;
     border:2px solid rgba(0,0,0,.35);
     background:#fff;
-    color:#111;
-    font-weight:900;
-    font-size:32px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    background-image:url('キラ.jpg');
+    background-size:cover;
+    background-position:center;
     box-shadow:0 18px 40px rgba(0,0,0,.25);
+  }
+  .arrest-kira-half::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    background:linear-gradient(130deg, rgba(255,255,255,.2), rgba(0,0,0,.12));
+    mix-blend-mode:screen;
+  }
+  .arrest-kira-overlay{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:150px;
+    height:150px;
+    transform:translate(-50%,-50%);
+    background-image:url('dnyes.jpg');
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    filter:drop-shadow(0 10px 22px rgba(0,0,0,.35));
+    pointer-events:none;
   }
   .arrest-kira-half.left{
     clip-path:polygon(0 0, 52% 0, 48% 100%, 0 100%);
@@ -994,15 +1015,10 @@
     border:none;
   }
 
-  @keyframes judgementTagPulse{
-    0%{ transform:translate(-50%,-50%) scale(1); }
-    50%{ transform:translate(-50%,-50%) scale(1.08); }
-    100%{ transform:translate(-50%,-50%) scale(1); }
-  }
-  .player-tag.judgement-targetable{
-    cursor:pointer;
-    animation: judgementTagPulse 820ms ease-in-out infinite;
-    box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  @keyframes judgementPickPulse{
+    0%  { transform:translate(-50%,0) scale(0.96); }
+    50% { transform:translate(-50%,0) scale(1.12); }
+    100%{ transform:translate(-50%,0) scale(0.96); }
   }
   .player-tag.judgement-self-hidden{
     opacity:0;
@@ -1044,7 +1060,8 @@
   }
   .judgement-canvas{
     position:absolute;
-    inset:0;
+    top:0;
+    left:0;
     cursor:crosshair;
     touch-action:none;
   }
@@ -1513,6 +1530,44 @@
     pointer-events:auto;
     box-shadow:0 0 0 2px rgba(17,17,17,.14), 0 2px 8px rgba(0,0,0,.18);
   }
+  /* ★ 裁き：対象選択用の正体カード（裏） */
+  .judgement-pick-card{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.22);
+    background-image:url('dnroleura.jpg');
+    background-size:cover;
+    background-position:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    animation: judgementPickPulse 760ms ease-in-out infinite;
+    z-index:31;
+    cursor:pointer;
+    pointer-events:auto;
+  }
+  .player-tag .judgement-pick-card{
+    margin-left:-40px;
+  }
+  /* ★ 裁き後：信者/キラの正体カード常時表示 */
+  .revealed-identity-card{
+    position:absolute;
+    left:50%;
+    top:0;
+    width:24px;height:33px;
+    border-radius:4px;
+    border:1px solid rgba(0,0,0,.45);
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,0);
+    z-index:29;
+    pointer-events:none;
+  }
+  .player-tag .revealed-identity-card{
+    margin-left:-40px;
+  }
   .player-tag.arrest-selected{
     box-shadow:none;
   }
@@ -1567,7 +1622,7 @@
     display:flex;
     flex-direction:column;
     gap:4px;
-    z-index:60;
+    z-index:200;
     pointer-events:none;
   }
   .vote7-result-tag{
@@ -1579,7 +1634,7 @@
     border-radius:999px;
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
-    z-index:61;
+    z-index:201;
   }
 
   /* ★ 9：尋問 方向選択ボタン */
@@ -1635,7 +1690,7 @@
     100%{ transform:scale(0.96); }
   }
   .player-tag.vote7-active{
-    z-index:20;
+    z-index:200;
   }
 </style>
 </head>
@@ -1731,7 +1786,7 @@
 
 <!-- ★ 2：使用確認ポップ（使用者だけ） -->
 <div id="gun2ConfirmPop" class="gun2-confirm-pop hidden yesno-pop" aria-hidden="true">
-  <div class="msg">2を使用しますか？</div>
+  <div class="msg">拳銃を使用しますか？</div>
   <div class="dialog-buttons">
     <button id="btnGun2Yes" class="btn primary">はい</button>
     <button id="btnGun2No" class="btn ghost">いいえ</button>
@@ -1740,10 +1795,10 @@
 
 <!-- ★ 1：逮捕（対象ポップ） -->
 <div id="arrestPop" class="arrest-pop hidden yesno-pop" aria-hidden="true">
-  <div class="msg">Are you Kira?</div>
+  <div class="msg">あなたはキラですか？</div>
   <div class="dialog-buttons">
-    <button id="btnArrestYes" class="btn primary">Yes</button>
-    <button id="btnArrestNo" class="btn ghost">No</button>
+    <button id="btnArrestYes" class="btn primary">はい</button>
+    <button id="btnArrestNo" class="btn ghost">いいえ</button>
   </div>
 </div>
 
@@ -1754,10 +1809,10 @@
 <div id="arrestYesOverlay" class="arrest-overlay hidden" aria-hidden="true">
   <div class="arrest-yes-stack">
     <div class="arrest-kira-card">
-      <div class="arrest-kira-half left">キラ</div>
-      <div class="arrest-kira-half right">キラ</div>
+      <div class="arrest-kira-half left"></div>
+      <div class="arrest-kira-half right"></div>
+      <div class="arrest-kira-overlay" aria-hidden="true"></div>
     </div>
-    <div class="arrest-image yes"></div>
   </div>
 </div>
 
@@ -1770,7 +1825,7 @@
     <div class="judgement-clock-hand second"></div>
     <div class="judgement-clock-center"></div>
   </div>
-  <div id="judgementCountdownText" class="judgement-countdown-text">3..</div>
+  <div id="judgementCountdownText" class="judgement-countdown-text">38..</div>
 </div>
 <div id="judgementNotebook" class="judgement-notebook hidden">
   <div class="judgement-page"></div>
@@ -2025,7 +2080,7 @@ const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
   { id: "0", name: "デスノート", effect: "ラウンドの終わりにキラがデスノートを持っているなら必ず裁きを行う。(1ラウンド目は無し。)", image: "デスノート.jpg" },
-  { id: "1", name: "逮捕", effect: "Lだけが使える。", image: "逮捕.jpg" },
+  { id: "1", name: "逮捕", effect: "Lだけが使える。キラなら一度だけ「いいえ」を選べる。", image: "逮捕.jpg" },
   { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
   { id: "3", name: "偽名", effect: "ノートに名前を書かれても一度だけ死なない。", image: "偽名.jpg" },
   { id: "4", name: "アリバイ", effect: "このカードがあれば、あなたがキラでも一度だけ逮捕されない。その時にこのカードは見せない。", image: "アリバイ.jpg" },
@@ -2485,10 +2540,10 @@ function updateExchangeLink(){
   linkLayer.innerHTML = `
     <defs>
       <marker id="arrowEnd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)"></path>
+        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)" stroke="#fff" stroke-width="1" stroke-linejoin="round"></path>
       </marker>
       <marker id="arrowStart" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto">
-        <path d="M10,0 L0,5 L10,10 Z" fill="rgba(17,17,17,.85)"></path>
+        <path d="M10,0 L0,5 L10,10 Z" fill="rgba(17,17,17,.85)" stroke="#fff" stroke-width="1" stroke-linejoin="round"></path>
       </marker>
     </defs>
     <line
@@ -2526,12 +2581,12 @@ function updateGun2Link(){
     return;
   }
 
-    const byEl = getPlayerTagEl(g.by);
-    const tgEl = getPlayerTagEl(g.targetId);
-    if (!byEl){
-      clearGun2Layer();
-      return;
-    }
+  const byEl = getPlayerTagEl(g.by);
+  const tgEl = getPlayerTagEl(g.targetId);
+  if (!byEl || !tgEl){
+    clearGun2Layer();
+    return;
+  }
 
   const pcRect = playerCircle.getBoundingClientRect();
   const br = byEl.getBoundingClientRect();
@@ -2539,44 +2594,10 @@ function updateGun2Link(){
   const x1 = (br.left + br.width/2) - pcRect.left;
   const y1 = (br.top  + br.height/2) - pcRect.top;
 
-  let x2 = x1;
-  let y2 = y1;
-
-  if (g.targetId === state.userId){
-    const idx = Number(g?.targetPick?.idx);
-    const myCard = Number.isFinite(idx) ? myHandEl?.querySelector(`.my-card[data-index="${idx}"]`) : null;
-    if (myCard){
-      const cr = myCard.getBoundingClientRect();
-      x2 = (cr.left + cr.width/2) - pcRect.left;
-      y2 = (cr.top  + cr.height/2) - pcRect.top;
-    } else if (myHandEl){
-      const hr = myHandEl.getBoundingClientRect();
-      x2 = (hr.left + hr.width/2) - pcRect.left;
-      y2 = (hr.top + 8) - pcRect.top;
-    }
-  } else if (tgEl){
-    const circleEl = tgEl.querySelector('.mini-hand-circle');
-    if (circleEl){
-      const cr = circleEl.getBoundingClientRect();
-      const cx = (cr.left + cr.width/2) - pcRect.left;
-      const cy = (cr.top + cr.height/2) - pcRect.top;
-      const dx = cx - x1;
-      const dy = cy - y1;
-      const dist = Math.max(1, Math.hypot(dx, dy));
-      const radius = Math.min(cr.width, cr.height) / 2 + 2;
-      const ux = dx / dist;
-      const uy = dy / dist;
-      x2 = cx - ux * radius;
-      y2 = cy - uy * radius;
-    } else {
-      const tr = tgEl.getBoundingClientRect();
-      x2 = (tr.left + tr.width/2) - pcRect.left;
-      y2 = (tr.top  + tr.height) - pcRect.top + 2;
-    }
-  } else {
-    clearGun2Layer();
-    return;
-  }
+  const labelEl = tgEl.querySelector('.player-label') || tgEl;
+  const tr = labelEl.getBoundingClientRect();
+  const x2 = (tr.left + tr.width / 2) - pcRect.left;
+  const y2 = (tr.top + tr.height / 2) - pcRect.top;
 
   const width = Math.max(1, pcRect.width);
   const height = Math.max(1, pcRect.height);
@@ -2665,7 +2686,7 @@ function updateWatchLink(){
   watchLayer.innerHTML = `
     <defs>
       <marker id="watchArrowEnd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)"></path>
+        <path d="M0,0 L10,5 L0,10 Z" fill="rgba(17,17,17,.85)" stroke="#fff" stroke-width="1" stroke-linejoin="round"></path>
       </marker>
     </defs>
     <line
@@ -4585,8 +4606,32 @@ function openJudgementNotebook(enableDraw){
   judgementNotebook.classList.remove('hidden');
   judgementNotebook.classList.add('open');
   if (judgementCanvas){
-    judgementCanvas.width = judgementNotebook.clientWidth;
-    judgementCanvas.height = judgementNotebook.clientHeight;
+    const pages = Array.from(judgementNotebook.querySelectorAll('.judgement-page'));
+    const noteRect = judgementNotebook.getBoundingClientRect();
+    if (pages.length){
+      const rects = pages.map((page) => page.getBoundingClientRect());
+      const minLeft = Math.min(...rects.map(r => r.left));
+      const minTop = Math.min(...rects.map(r => r.top));
+      const maxRight = Math.max(...rects.map(r => r.right));
+      const maxBottom = Math.max(...rects.map(r => r.bottom));
+      const width = maxRight - minLeft;
+      const height = maxBottom - minTop;
+      judgementCanvas.width = Math.round(width);
+      judgementCanvas.height = Math.round(height);
+      judgementCanvas.style.left = `${minLeft - noteRect.left}px`;
+      judgementCanvas.style.top = `${minTop - noteRect.top}px`;
+      judgementCanvas.style.width = `${width}px`;
+      judgementCanvas.style.height = `${height}px`;
+    } else {
+      const width = judgementNotebook.clientWidth;
+      const height = judgementNotebook.clientHeight;
+      judgementCanvas.width = Math.round(width);
+      judgementCanvas.height = Math.round(height);
+      judgementCanvas.style.left = '0px';
+      judgementCanvas.style.top = '0px';
+      judgementCanvas.style.width = `${width}px`;
+      judgementCanvas.style.height = `${height}px`;
+    }
     judgementCanvas.style.pointerEvents = enableDraw ? 'auto' : 'none';
   }
   judgementDrawActive = !!enableDraw;
@@ -4670,7 +4715,8 @@ function syncJudgementUI(){
     setJudgementSecondHandPosition(remaining);
     const shouldShowCountdown = j.countdownMode === 'postWrite' ? true : !j.kiraHasZero;
     if (remaining > 0){
-      showJudgementMessage(shouldShowCountdown, `${remaining}..`);
+      const displayCount = 41 - remaining;
+      showJudgementMessage(shouldShowCountdown, `${displayCount}..`);
       if (judgementCountdownTimer){
         clearTimeout(judgementCountdownTimer);
       }
@@ -5698,10 +5744,12 @@ function getDiscardStartPoint(targetId){
     const circleEl = tag.querySelector('.mini-hand-circle');
     if (circleEl){
       const cr = circleEl.getBoundingClientRect();
-      return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
+      if (cr.width > 0 && cr.height > 0){
+        return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
+      }
     }
     const tr = tag.getBoundingClientRect();
-    return { x: tr.left + tr.width/2, y: tr.top + tr.height/2 };
+    return { x: tr.left + tr.width/2, y: tr.top + tr.height + 18 };
   }
   const pc = playerCircle.getBoundingClientRect();
   return { x: pc.left + pc.width/2, y: pc.top + pc.height/2 };
@@ -6613,17 +6661,15 @@ function renderPlayerCircle(players){
       });
     }
 
+    const eliminated = isEliminated(p.id);
+    const myIdentity = getMyIdentity();
+    const judgementRevealed = Number(state.room?.judgementMeta?.lastRound || 0) >= 2;
     const j = getJudgement();
     const isJudgementSelecting = !!(j?.active && j.phase === 'select' && j.kiraId === state.userId);
     const isJudgementWriting = !!(j?.active && j.phase === 'writing' && j.kiraId === state.userId);
+    const canPickJudgementTarget = isJudgementSelecting && p.id !== state.userId && !eliminated;
     if ((isJudgementSelecting || isJudgementWriting) && p.id === state.userId){
       tag.classList.add('judgement-self-hidden');
-    }
-    if (isJudgementSelecting && p.id !== state.userId){
-      tag.classList.add('judgement-targetable');
-      tag.addEventListener('click', async () => {
-        await pickJudgementTarget(p.id);
-      });
     }
 
     /* ★ 5（証人）：対象選択（使用者だけ）
@@ -6652,9 +6698,12 @@ function renderPlayerCircle(players){
     const rawHandCards = Array.isArray(handData?.cards) ? handData.cards : [];
     const displayHandCards = getCardsWithReveal011Pending(p.id, rawHandCards);
     const eliminatedRecord = state.eliminated?.[p.id];
-    const eliminated = isEliminated(p.id);
     const eliminatedIdentity = eliminatedRecord?.identity || handData?.identity || '？';
     const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
+    const shouldRevealIdentity = judgementRevealed && (
+      (myIdentity === 'キラ' && handData?.identity === '信者')
+      || (myIdentity === '信者' && handData?.identity === 'キラ')
+    );
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     const showAliasReveal = !!(state.alias3Event && state.alias3Event.targetId === p.id);
@@ -6745,6 +6794,24 @@ function renderPlayerCircle(players){
         }
       }
 
+      if (shouldRevealIdentity && p.id !== state.userId){
+        const revealCard = document.createElement('div');
+        revealCard.className = 'revealed-identity-card';
+        applyIdentityCardFace(revealCard, handData?.identity || '');
+        miniHand.appendChild(revealCard);
+      }
+
+      if (canPickJudgementTarget){
+        const pickCard = document.createElement('div');
+        pickCard.className = 'judgement-pick-card';
+        pickCard.title = '正体カード（裏）';
+        pickCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickJudgementTarget(p.id);
+        });
+        miniHand.appendChild(pickCard);
+      }
+
       const count = displayHandCards.length;
       const spread = 70;
       const base = (count > 1) ? (-spread/2) : 0;
@@ -6799,7 +6866,7 @@ function renderPlayerCircle(players){
 
       tag.appendChild(miniHand);
     } else {
-      // 扇手札が無いケースでも、5の選択UIだけは出す
+      // 扇手札が無いケースでも、選択UIだけは出す
       if (iAmWitnessBy && p.id !== state.userId){
         const miniHand = document.createElement('div');
         miniHand.className = 'mini-hand';
@@ -6814,6 +6881,22 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
+        if (shouldRevealIdentity && p.id !== state.userId){
+          const revealCard = document.createElement('div');
+          revealCard.className = 'revealed-identity-card';
+          applyIdentityCardFace(revealCard, handData?.identity || '');
+          miniHand.appendChild(revealCard);
+        }
+        if (canPickJudgementTarget){
+          const pickCard = document.createElement('div');
+          pickCard.className = 'judgement-pick-card';
+          pickCard.title = '正体カード（裏）';
+          pickCard.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickJudgementTarget(p.id);
+          });
+          miniHand.appendChild(pickCard);
+        }
         tag.appendChild(miniHand);
       } else if (isArrestByMe && p.id !== state.userId && !eliminated){
         const miniHand = document.createElement('div');
@@ -6828,6 +6911,22 @@ function renderPlayerCircle(players){
           await pickArrest1Target(p.id);
         });
         miniHand.appendChild(arrestCard);
+        if (shouldRevealIdentity && p.id !== state.userId){
+          const revealCard = document.createElement('div');
+          revealCard.className = 'revealed-identity-card';
+          applyIdentityCardFace(revealCard, handData?.identity || '');
+          miniHand.appendChild(revealCard);
+        }
+        if (canPickJudgementTarget){
+          const pickCard = document.createElement('div');
+          pickCard.className = 'judgement-pick-card';
+          pickCard.title = '正体カード（裏）';
+          pickCard.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickJudgementTarget(p.id);
+          });
+          miniHand.appendChild(pickCard);
+        }
         tag.appendChild(miniHand);
       } else if (eliminated && !eliminatedDiscardedAt && p.id !== state.userId){
         const miniHand = document.createElement('div');
@@ -6846,6 +6945,22 @@ function renderPlayerCircle(players){
         const miniCircle = document.createElement('div');
         miniCircle.className = 'mini-hand-circle';
         miniHand.appendChild(miniCircle);
+        if (shouldRevealIdentity && p.id !== state.userId){
+          const revealCard = document.createElement('div');
+          revealCard.className = 'revealed-identity-card';
+          applyIdentityCardFace(revealCard, handData?.identity || '');
+          miniHand.appendChild(revealCard);
+        }
+        if (canPickJudgementTarget){
+          const pickCard = document.createElement('div');
+          pickCard.className = 'judgement-pick-card';
+          pickCard.title = '正体カード（裏）';
+          pickCard.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await pickJudgementTarget(p.id);
+          });
+          miniHand.appendChild(pickCard);
+        }
         tag.appendChild(miniHand);
       } else {
         // 他人側：対象だけ裏を表示
@@ -6864,9 +6979,50 @@ function renderPlayerCircle(players){
           idBack.style.cursor = 'default';
           idBack.style.pointerEvents = 'none';
           miniHand.appendChild(idBack);
+          if (shouldRevealIdentity && p.id !== state.userId){
+            const revealCard = document.createElement('div');
+            revealCard.className = 'revealed-identity-card';
+            applyIdentityCardFace(revealCard, handData?.identity || '');
+            miniHand.appendChild(revealCard);
+          }
+          if (canPickJudgementTarget){
+            const pickCard = document.createElement('div');
+            pickCard.className = 'judgement-pick-card';
+            pickCard.title = '正体カード（裏）';
+            pickCard.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              await pickJudgementTarget(p.id);
+            });
+            miniHand.appendChild(pickCard);
+          }
           tag.appendChild(miniHand);
         }
       }
+    }
+
+    if ((shouldRevealIdentity || canPickJudgementTarget) && p.id !== state.userId && !tag.querySelector('.mini-hand')){
+      const miniHand = document.createElement('div');
+      miniHand.className = 'mini-hand';
+      const miniCircle = document.createElement('div');
+      miniCircle.className = 'mini-hand-circle';
+      miniHand.appendChild(miniCircle);
+      if (shouldRevealIdentity){
+        const revealCard = document.createElement('div');
+        revealCard.className = 'revealed-identity-card';
+        applyIdentityCardFace(revealCard, handData?.identity || '');
+        miniHand.appendChild(revealCard);
+      }
+      if (canPickJudgementTarget){
+        const pickCard = document.createElement('div');
+        pickCard.className = 'judgement-pick-card';
+        pickCard.title = '正体カード（裏）';
+        pickCard.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await pickJudgementTarget(p.id);
+        });
+        miniHand.appendChild(pickCard);
+      }
+      tag.appendChild(miniHand);
     }
 
     playerCircle.appendChild(tag);
