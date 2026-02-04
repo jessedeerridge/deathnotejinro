@@ -6740,6 +6740,9 @@ function renderPlayerCircle(players){
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     const showAliasReveal = !!(state.alias3Event && state.alias3Event.targetId === p.id);
+    const isWatari = myIdentity === 'ワタリ' || myIdentity === 'Watari';
+    const shouldShowWatariReveal = isWatari && (handData?.identity === 'L' || handData?.identity === 'L2');
+    const shouldShowIdentityMini = shouldRevealIdentity || shouldShowWatariReveal;
     let gun2RevealIdx = null;
     let gun2RevealCard = null;
     if (showGun2Reveal){
@@ -6827,7 +6830,7 @@ function renderPlayerCircle(players){
         }
       }
 
-      if (shouldRevealIdentity && p.id !== state.userId){
+      if (shouldShowIdentityMini && p.id !== state.userId){
         const revealCard = document.createElement('div');
         revealCard.className = 'revealed-identity-card';
         applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -6917,7 +6920,7 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
-        if (shouldRevealIdentity && p.id !== state.userId){
+        if (shouldShowIdentityMini && p.id !== state.userId){
           const revealCard = document.createElement('div');
           revealCard.className = 'revealed-identity-card';
           applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -6950,7 +6953,7 @@ function renderPlayerCircle(players){
           await pickArrest1Target(p.id);
         });
         miniHand.appendChild(arrestCard);
-        if (shouldRevealIdentity && p.id !== state.userId){
+        if (shouldShowIdentityMini && p.id !== state.userId){
           const revealCard = document.createElement('div');
           revealCard.className = 'revealed-identity-card';
           applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -6987,7 +6990,7 @@ function renderPlayerCircle(players){
         const miniCircle = document.createElement('div');
         miniCircle.className = 'mini-hand-circle';
         miniHand.appendChild(miniCircle);
-        if (shouldRevealIdentity && p.id !== state.userId){
+        if (shouldShowIdentityMini && p.id !== state.userId){
           const revealCard = document.createElement('div');
           revealCard.className = 'revealed-identity-card';
           applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -7024,7 +7027,7 @@ function renderPlayerCircle(players){
           idBack.style.cursor = 'default';
           idBack.style.pointerEvents = 'none';
           miniHand.appendChild(idBack);
-          if (shouldRevealIdentity && p.id !== state.userId){
+          if (shouldShowIdentityMini && p.id !== state.userId){
             const revealCard = document.createElement('div');
             revealCard.className = 'revealed-identity-card';
             applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -7048,13 +7051,13 @@ function renderPlayerCircle(players){
       }
     }
 
-    if ((shouldRevealIdentity || canPickJudgementTarget) && p.id !== state.userId && !tag.querySelector('.mini-hand')){
+    if ((shouldShowIdentityMini || canPickJudgementTarget) && p.id !== state.userId && !tag.querySelector('.mini-hand')){
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
       const miniCircle = document.createElement('div');
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
-      if (shouldRevealIdentity){
+      if (shouldShowIdentityMini){
         const revealCard = document.createElement('div');
         revealCard.className = 'revealed-identity-card';
         applyIdentityCardFace(revealCard, handData?.identity || '');
