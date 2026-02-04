@@ -3208,16 +3208,17 @@ function subscribeAlias3Event(){
     renderHands();
     const elapsed = Number(now - Number(ev.at || now));
     const remaining = Math.max(0, ALIAS3_DISPLAY_MS - elapsed);
-    showTimedOverlay(gimeiOverlay, remaining, gimeiOverlayTimer);
+    const displayMs = remaining > 0 ? ALIAS3_DISPLAY_MS : 0;
+    showTimedOverlay(gimeiOverlay, displayMs, gimeiOverlayTimer);
     if (aliasRevealTimer){
       clearTimeout(aliasRevealTimer);
     }
-    if (remaining > 0){
+    if (displayMs > 0){
       aliasRevealTimer = setTimeout(() => {
         aliasRevealTimer = null;
         state.alias3Event = null;
         renderHands();
-      }, remaining);
+      }, displayMs);
     } else {
       state.alias3Event = null;
       renderHands();
@@ -5079,6 +5080,7 @@ async function resolveJudgementRevealSequence(revealedAt){
       const result = await executeJudgementElimination(latest.targetId);
       if (result?.aliasUsed){
         await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
+        await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
         await emitAlias3Event(latest.targetId);
         await sleep(ALIAS3_DISPLAY_MS);
         await set(ref(db, `rooms/${state.roomCode}/alias3Event`), null);
