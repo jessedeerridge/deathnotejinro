@@ -1788,7 +1788,7 @@
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">小さい方のカードを選んでください。</div>
 <div id="exchangeReturnPop" class="exchange-return-pop hidden">手札から渡したいカードを選んでください。</div>
-<div id="witnessPop" class="witness-pop hidden">5の効果：正体カード（裏）をクリックして対象選択</div>
+<div id="witnessPop" class="witness-pop hidden">正体を見たいプレイヤーを選んでください。</div>
 <div id="votePop" class="vote-pop hidden">7の効果：投票するプレイヤーを選択</div>
 
 <div id="seatPop" class="seat-pop hidden">
@@ -1854,14 +1854,14 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAMeKfMoHt9qO2VuUBpkrKuei7yGBbEi8",
-  authDomain: "cheesetheft-fd52f.firebaseapp.com",
-  databaseURL: "https://cheesetheft-fd52f-default-rtdb.firebaseio.com",
-  projectId: "cheesetheft-fd52f",
-  storageBucket: "cheesetheft-fd52f.firebasestorage.app",
-  messagingSenderId: "298688959395",
-  appId: "1:298688959395:web:6ac2c3eb214201f2020016",
-  measurementId: "G-HPDFTCLR8H"
+  apiKey: "AIzaSyDUP1foVQnitM45do_UtYLkcc9gvgQC-xw",
+  authDomain: "timebomb-3b0c7.firebaseapp.com",
+  databaseURL: "https://timebomb-3b0c7-default-rtdb.firebaseio.com",
+  projectId: "timebomb-3b0c7",
+  storageBucket: "timebomb-3b0c7.firebasestorage.app",
+  messagingSenderId: "532935786630",
+  appId: "1:532935786630:web:ef1f97c862bfaad67d1107",
+  measurementId: "G-K8NRR8K64Y"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -2024,7 +2024,7 @@ const btnJudgementWriteYes = document.getElementById('btnJudgementWriteYes');
 
 /* ===== カード説明 ===== */
 const CARD_LIBRARY = [
-  { id: "0", name: "デスノート", effect: "", image: "デスノート.jpg" },
+  { id: "0", name: "デスノート", effect: "ラウンドの終わりにキラがデスノートを持っているなら必ず裁きを行う。(1ラウンド目は無し。)", image: "デスノート.jpg" },
   { id: "1", name: "逮捕", effect: "Lだけが使える。", image: "逮捕.jpg" },
   { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
   { id: "3", name: "偽名", effect: "ノートに名前を書かれても一度だけ死なない。", image: "偽名.jpg" },
@@ -2037,13 +2037,16 @@ const CARD_LIBRARY = [
   { id: "13", name: "死神", effect: "全員が目を閉じ、キラはデスノートを持っているプレイヤーを知る。", image: "死神.jpg" },
 ];
 const IDENTITY_HELP = [
-  { id: "キラ", name: "キラ", text: "デスノート側。Lを出し抜いて勝利を目指す。" },
-  { id: "L", name: "L", text: "警察と協力してキラを見つける。" },
-  { id: "警察1", name: "警察", text: "Lの味方。キラの逮捕を助ける。" },
-  { id: "警察2", name: "警察", text: "Lの味方。キラの逮捕を助ける。" },
-  { id: "信者", name: "信者", text: "キラの味方。キラを支援する。" },
-  { id: "L2", name: "L2", text: "Lの味方。捜査に協力する。" },
+  { id: "キラ", name: "キラ", text: "裁きの時間にデスノートがあれば、誰かの名前を書く。Lに正体がばれないようにしよう。" },
+  { id: "L", name: "L", text: "逮捕ができるのはLだけだ。警察と協力してキラを見つけだそう。" },
+  { id: "警察1", name: "警察", text: "Lの味方。キラの逮捕を助けよう。" },
+  { id: "警察2", name: "警察", text: "Lの味方。キラの逮捕を助けよう。" },
+  { id: "信者", name: "信者", text: "キラの味方。キラを支援しよう。" },
+  { id: "L2", name: "L", text: "逮捕ができるのはLだけだ。警察と協力してキラを見つけだそう。" },
+  { id: "L2", name: "w", text: "逮捕ができるのはLだけだ。警察と協力してキラを見つけだそう。" },
+  { id: "ワタリ", name: "ワタリ", text: "Lの正体を知る。協力してキラを見つけだそう。" },
 ];
+
 const CARD_LOOKUP = new Map(CARD_LIBRARY.map(card => [card.id, card]));
 const ROLE_HELP = CARD_LIBRARY.map(card => ({
   id: card.id,
@@ -2818,7 +2821,7 @@ function updateTurnUI(){
     exchangeReturnPop.classList.add('hidden');
     if (ex?.phase === 'pickTarget'){
       if (isBy){
-        exchangeReturnPop.textContent = '8の効果：対象プレイヤーを選択';
+        exchangeReturnPop.textContent = '交換したいプレイヤーを選んでください。';
         exchangeReturnPop.classList.remove('hidden');
       }
     } else if (ex?.phase === 'targetPickMin'){
@@ -6975,6 +6978,7 @@ function buildIdentityDeck(playerCount){
   const roles = ["キラ","L","警察1","警察2"];
   if (playerCount === 5) roles.push("信者");
   if (playerCount === 6) roles.push("L2");
+  if (playerCount === 7) roles.push("ワタリ");
   let policeIndex = 3;
   while (roles.length < playerCount) roles.push(`警察${policeIndex++}`);
   return roles.slice(0, playerCount);
