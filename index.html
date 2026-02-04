@@ -2043,6 +2043,7 @@ const IDENTITY_HELP = [
   { id: "警察2", name: "警察", text: "Lの味方。キラの逮捕を助ける。" },
   { id: "信者", name: "信者", text: "キラの味方。キラを支援する。" },
   { id: "L2", name: "L2", text: "Lの味方。捜査に協力する。" },
+  { id: "ワタリ", name: "ワタリ", text: "Lの味方。捜査と補佐に協力する。" },
 ];
 const CARD_LOOKUP = new Map(CARD_LIBRARY.map(card => [card.id, card]));
 const ROLE_HELP = CARD_LIBRARY.map(card => ({
@@ -6975,6 +6976,7 @@ function buildIdentityDeck(playerCount){
   const roles = ["キラ","L","警察1","警察2"];
   if (playerCount === 5) roles.push("信者");
   if (playerCount === 6) roles.push("L2");
+  if (playerCount === 7) roles.push("ワタリ");
   let policeIndex = 3;
   while (roles.length < playerCount) roles.push(`警察${policeIndex++}`);
   return roles.slice(0, playerCount);
