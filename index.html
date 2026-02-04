@@ -524,11 +524,11 @@
      ========================================================= */
   @keyframes witnessIdPulse{
     0%  { transform:translate(-50%,0) scale(1); }
-    50% { transform:translate(-50%,0) scale(1.14); }
+    50% { transform:translate(-50%,0) scale(1.2); }
     100%{ transform:translate(-50%,0) scale(1); }
   }
   .player-tag.witness5-targetable{
-    box-shadow:0 0 0 2px rgba(17,17,17,.10);
+    box-shadow:none;
   }
   .player-tag.witness5-targetable .mini-hand{ pointer-events:auto; }
   .witness-id-back{
@@ -630,6 +630,22 @@
     width:0; height:0;
     pointer-events:none;
   }
+  .witness-target-tag{
+    position:fixed;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-128px);
+    padding:4px 10px;
+    border-radius:999px;
+    background:#111;
+    border:1px solid #111;
+    color:#fff;
+    font-size:14px;
+    font-weight:700;
+    z-index:83;
+    white-space:nowrap;
+  }
+  .witness-target-tag.hidden{ display:none; }
   .witness-card{
     position:absolute;
     width:110px; height:165px;
@@ -1018,7 +1034,7 @@
 
   @keyframes judgementPickPulse{
     0%  { transform:translate(-50%,0) scale(0.96); }
-    50% { transform:translate(-50%,0) scale(1.12); }
+    50% { transform:translate(-50%,0) scale(1.2); }
     100%{ transform:translate(-50%,0) scale(0.96); }
   }
   .player-tag.judgement-self-hidden{
@@ -1495,7 +1511,8 @@
   /* ★ 5：ポップ（対象選択中） */
   .witness-pop{
     position:fixed;
-    left:50%; top:70px;
+    left:50%;
+    bottom:14px;
     transform:translateX(-50%);
     background:rgba(20,20,20,.92);color:#fff;
     padding:10px 12px;border-radius:14px;
@@ -1510,7 +1527,7 @@
   /* ★ 1：逮捕（正体カードパルス） */
   @keyframes arrestIdPulse{
     0%  { transform:translate(-50%,0) scale(0.96); }
-    50% { transform:translate(-50%,0) scale(1.12); }
+    50% { transform:translate(-50%,0) scale(1.2); }
     100%{ transform:translate(-50%,0) scale(0.96); }
   }
   .arrest-id-card{
@@ -1780,6 +1797,7 @@
 <div id="witnessBackdrop" class="witness-backdrop hidden" aria-hidden="true">
   <div id="witnessHand" class="witness-hand"></div>
 </div>
+<div id="witnessTargetTag" class="witness-target-tag hidden" aria-hidden="true"></div>
 
 <!-- ★ 5：閉じる確認ポップ（使用者だけ） -->
 <div id="witnessClosePop" class="witness-close-pop hidden" aria-hidden="true">
@@ -1947,6 +1965,8 @@ const EXCHANGE_ANIM_MS = 620;
 const EXCHANGE_WAIT_BEFORE_MOVE_MS = 1000;
 const REVEAL011_MOVE_MS = 520;
 const REVEAL011_SHUFFLE_MS = 560;
+const ARREST_OVERLAY_MS = 1800;
+const ARREST_NO_DRAW_DELAY_MS = 1000;
 let localDirChoice = null;
 
 /* ★ 6（監視） */
@@ -2053,6 +2073,7 @@ const btnWatchCloseYes = document.getElementById('btnWatchCloseYes');
 /* ★ 5（目撃）中央表示 */
 const witnessBackdrop = document.getElementById('witnessBackdrop');
 const witnessHandEl = document.getElementById('witnessHand');
+const witnessTargetTag = document.getElementById('witnessTargetTag');
 /* ★ 5：閉じる確認 */
 const witnessClosePop = document.getElementById('witnessClosePop');
 const btnWitnessCloseYes = document.getElementById('btnWitnessCloseYes');
@@ -2425,7 +2446,7 @@ function shouldDisablePlayCard(cardId){
   if (!state.isPlayable) return false;
   const id = String(cardId ?? '');
   if (id === '0') return true;
-  if (id === '1' && getMyIdentity() !== 'L') return true;
+  if (id === '1' && !['L', 'L2'].includes(getMyIdentity())) return true;
   return false;
 }
 function updatePlayDisabledForHand(){
@@ -4469,7 +4490,7 @@ function showArrestOverlay(type){
   setTimeout(() => {
     overlay.classList.add('hidden');
     overlay.setAttribute('aria-hidden', 'true');
-  }, 1800);
+  }, ARREST_OVERLAY_MS);
 }
 
 async function startArrest1(byPlayerId){
@@ -4533,6 +4554,7 @@ async function resolveArrest1Answer(answer){
     await updateKiraArrestMeta({ usedAlibi: answer === 'no' });
   }
 
+  const isNo = answer === 'no';
   const eventId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const updates = {};
   updates[`rooms/${state.roomCode}/arrest1`] = null;
@@ -4541,9 +4563,12 @@ async function resolveArrest1Answer(answer){
     type: answer,
     at: Date.now()
   };
-  updates[`rooms/${state.roomCode}/turn/paused`] = false;
+  updates[`rooms/${state.roomCode}/turn/paused`] = isNo;
   await update(ref(db, `/`), updates);
 
+  if (isNo){
+    await sleep(ARREST_OVERLAY_MS + ARREST_NO_DRAW_DELAY_MS);
+  }
   await advanceTurnToNextPlayer();
 }
 
@@ -5276,6 +5301,8 @@ function syncWitnessCenterOverlay(){
 
   witnessClosePop.classList.add('hidden');
   witnessClosePop.setAttribute('aria-hidden', 'true');
+  witnessTargetTag?.classList.add('hidden');
+  witnessTargetTag?.setAttribute('aria-hidden', 'true');
 
   if (!iAmBy){
     witnessBackdrop.classList.add('hidden');
@@ -5296,6 +5323,11 @@ function syncWitnessCenterOverlay(){
 
   witnessClosePop.classList.remove('hidden');
   witnessClosePop.setAttribute('aria-hidden', 'false');
+  if (witnessTargetTag){
+    witnessTargetTag.textContent = getPlayerNameById(wi.targetId);
+    witnessTargetTag.classList.remove('hidden');
+    witnessTargetTag.setAttribute('aria-hidden', 'false');
+  }
 }
 
 /* ★ 5：画面下「はい」で閉じる → ターン終了 */
@@ -5615,6 +5647,29 @@ function shuffleInPlace(arr){
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function shuffleWithTopGuarantees(deck, topCount, requiredCards){
+  if (!Array.isArray(deck) || !deck.length) return;
+  const limit = Math.max(0, Math.min(Number(topCount || 0), deck.length));
+  if (!limit) return;
+
+  shuffleInPlace(deck);
+
+  requiredCards.forEach((cardId) => {
+    const card = String(cardId);
+    if (deck.slice(0, limit).includes(card)) return;
+    const idx = deck.indexOf(card);
+    if (idx < 0) return;
+    const swapIndex = Math.floor(Math.random() * limit);
+    [deck[swapIndex], deck[idx]] = [deck[idx], deck[swapIndex]];
+  });
+
+  const topSegment = deck.slice(0, limit);
+  shuffleInPlace(topSegment);
+  for (let i = 0; i < limit; i += 1){
+    deck[i] = topSegment[i];
+  }
 }
 
 async function emitReshuffleEvent(count){
@@ -7132,7 +7187,7 @@ function buildDeckForPlayers(playerCount){
     pushN(deck, 1, 1);
     pushN(deck, 2, 1);
     pushN(deck, 3, 1);
-    pushN(deck, 5, 0);
+    pushN(deck, 5, 5);
     pushN(deck, 4, 1);
     pushN(deck, 6, 1);
     pushN(deck, 7, 2);
@@ -7208,7 +7263,7 @@ async function dealAllCardsAndInitialDraw(){
   if (playerCount <= 0) return;
 
   const deckRaw = buildDeckForPlayers(playerCount);
-  shuffleInPlace(deckRaw);
+  shuffleWithTopGuarantees(deckRaw, playerCount, ['0', '1']);
 
   const idDeck = buildIdentityDeck(playerCount);
   shuffleInPlace(idDeck);
