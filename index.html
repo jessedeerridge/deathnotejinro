@@ -123,6 +123,7 @@
     box-shadow:0 10px 26px rgba(0,0,0,.18);
     transform:translate(-50%,-50%) translate(40px, 36px) rotate(3deg);
     z-index:10;
+    color:#fff;
     pointer-events:none;
   }
   .card1-spot.hidden{display:none;}
@@ -1016,7 +1017,7 @@
 
   @keyframes judgementTagPulse{
     0%{ transform:scale(1); }
-    50%{ transform:scale(1.08); }
+    50%{ transform:scale(1.12); }
     100%{ transform:scale(1); }
   }
   .player-tag.judgement-targetable{
@@ -1589,7 +1590,7 @@
     display:flex;
     flex-direction:column;
     gap:4px;
-    z-index:90;
+    z-index:120;
     pointer-events:none;
   }
   .vote7-result-tag{
@@ -1601,7 +1602,7 @@
     border-radius:999px;
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
-    z-index:91;
+    z-index:121;
   }
 
   /* ★ 9：尋問 方向選択ボタン */
@@ -1657,7 +1658,7 @@
     100%{ transform:scale(0.96); }
   }
   .player-tag.vote7-active{
-    z-index:70;
+    z-index:120;
   }
 </style>
 </head>
@@ -4573,27 +4574,14 @@ function openJudgementNotebook(enableDraw){
   judgementNotebook.classList.remove('hidden');
   judgementNotebook.classList.add('open');
   if (judgementCanvas){
-    const pages = judgementNotebook.querySelectorAll('.judgement-page');
-    const targetPage = pages?.[1] || pages?.[0];
-    if (targetPage){
-      const noteRect = judgementNotebook.getBoundingClientRect();
-      const pageRect = targetPage.getBoundingClientRect();
-      const left = pageRect.left - noteRect.left;
-      const top = pageRect.top - noteRect.top;
-      judgementCanvas.width = Math.round(pageRect.width);
-      judgementCanvas.height = Math.round(pageRect.height);
-      judgementCanvas.style.left = `${left}px`;
-      judgementCanvas.style.top = `${top}px`;
-      judgementCanvas.style.width = `${pageRect.width}px`;
-      judgementCanvas.style.height = `${pageRect.height}px`;
-    } else {
-      judgementCanvas.width = judgementNotebook.clientWidth;
-      judgementCanvas.height = judgementNotebook.clientHeight;
-      judgementCanvas.style.left = '0px';
-      judgementCanvas.style.top = '0px';
-      judgementCanvas.style.width = `${judgementNotebook.clientWidth}px`;
-      judgementCanvas.style.height = `${judgementNotebook.clientHeight}px`;
-    }
+    const width = judgementNotebook.clientWidth;
+    const height = judgementNotebook.clientHeight;
+    judgementCanvas.width = Math.round(width);
+    judgementCanvas.height = Math.round(height);
+    judgementCanvas.style.left = '0px';
+    judgementCanvas.style.top = '0px';
+    judgementCanvas.style.width = `${width}px`;
+    judgementCanvas.style.height = `${height}px`;
     judgementCanvas.style.pointerEvents = enableDraw ? 'auto' : 'none';
   }
   judgementDrawActive = !!enableDraw;
@@ -5706,7 +5694,9 @@ function getDiscardStartPoint(targetId){
     const circleEl = tag.querySelector('.mini-hand-circle');
     if (circleEl){
       const cr = circleEl.getBoundingClientRect();
-      return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
+      if (cr.width > 0 && cr.height > 0){
+        return { x: cr.left + cr.width/2, y: cr.top + cr.height/2 };
+      }
     }
     const tr = tag.getBoundingClientRect();
     return { x: tr.left + tr.width/2, y: tr.top + tr.height + 18 };
