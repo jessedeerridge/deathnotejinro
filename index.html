@@ -101,6 +101,19 @@
     z-index:11;
     pointer-events:none;
   }
+  .card1-spot{
+    position:absolute;
+    left:50%; top:50%;
+    width:60px;height:90px;border-radius:8px;
+    border:1px solid rgba(0,0,0,.18);
+    background:#111;
+    display:flex;align-items:stretch;justify-content:stretch;
+    box-shadow:0 10px 26px rgba(0,0,0,.18);
+    transform:translate(-50%,-50%) translate(26px, 22px) rotate(3deg);
+    z-index:10;
+    pointer-events:none;
+  }
+  .card1-spot.hidden{display:none;}
   .discard-card{
     position:absolute;
     width:60px;height:90px;border-radius:8px;
@@ -1458,6 +1471,7 @@
       <div id="centerArea" class="center-area">CENTER</div>
 
       <div id="discardStack" class="discard-stack"></div>
+      <div id="card1Spot" class="card1-spot hidden"></div>
 
       <!-- ★ 8：点線矢印リンク用SVG -->
       <svg id="linkLayer" class="link-layer"></svg>
@@ -1686,6 +1700,7 @@ const state = {
   room: {},
   deck: [],
   discard: [],
+  card1Spot: null,
   turn: { currentPlayerId:null, turnSeq:0, drawn:false, paused:false },
   turnPlayerId: null,
   isMyTurn: false,
@@ -1736,6 +1751,7 @@ const witnessLayer = document.getElementById('witnessLayer');
 const gun2Layer = document.getElementById('gun2Layer');
 
 const discardStackEl = document.getElementById('discardStack');
+const card1SpotEl = document.getElementById('card1Spot');
 
 const myHandEl = document.getElementById('myHand');
 const myIdentityEl = document.getElementById('myIdentity');
@@ -2656,6 +2672,14 @@ function subscribeDiscard(){
   });
 }
 
+function subscribeCard1Spot(){
+  const spotRef = ref(db, `rooms/${state.roomCode}/card1Spot`);
+  onValue(spotRef, snap => {
+    state.card1Spot = snap.val() || null;
+    renderCard1Spot();
+  });
+}
+
 function subscribeEliminated(){
   const elimRef = ref(db, `rooms/${state.roomCode}/eliminated`);
   onValue(elimRef, snap => {
@@ -3056,6 +3080,19 @@ function renderDiscardCenter(){
     card.style.zIndex = String(20 + i);
     discardStackEl.appendChild(card);
   });
+}
+
+function renderCard1Spot(){
+  if (!card1SpotEl) return;
+  const spot = state.card1Spot;
+  if (!spot || !spot.card){
+    card1SpotEl.classList.add('hidden');
+    card1SpotEl.textContent = '';
+    card1SpotEl.style.backgroundImage = '';
+    return;
+  }
+  card1SpotEl.classList.remove('hidden');
+  applyCardFace(card1SpotEl, spot.card);
 }
 
 /* ====== ドラッグ ====== */
@@ -5604,10 +5641,14 @@ async function playCardFromHand(cardIndex){
 
   await update(ref(db, `rooms/${state.roomCode}/hands/${myId}`), { cards });
 
-  const discardRef = ref(db, `rooms/${state.roomCode}/discard`);
-  const ds = await get(discardRef);
-  const discard = ds.val() || [];
-  await set(discardRef, [...discard, { by: myId, targetId: myId, card: used, at: Date.now(), reason: 'play' }]);
+  if (used === "1"){
+    await set(ref(db, `rooms/${state.roomCode}/card1Spot`), { by: myId, card: used, at: Date.now() });
+  } else {
+    const discardRef = ref(db, `rooms/${state.roomCode}/discard`);
+    const ds = await get(discardRef);
+    const discard = ds.val() || [];
+    await set(discardRef, [...discard, { by: myId, targetId: myId, card: used, at: Date.now(), reason: 'play' }]);
+  }
 
   if (used === "9"){
     await startInvestigationChooseDir(myId);
@@ -5780,6 +5821,7 @@ btnJoin.addEventListener('click', async () => {
   subscribeHands();
   subscribeDeck();
   subscribeDiscard();
+  subscribeCard1Spot();
   subscribeEliminated();
   subscribeTurn();
   subscribeDrawEvent();
@@ -5947,6 +5989,7 @@ function renderPlayerCircle(players){
   playerCircle.appendChild(deckPile);
   playerCircle.appendChild(centerArea);
   playerCircle.appendChild(discardStackEl);
+  playerCircle.appendChild(card1SpotEl);
   playerCircle.appendChild(linkLayer);
   playerCircle.appendChild(gun2Layer);
   playerCircle.appendChild(watchLayer);
@@ -6356,16 +6399,16 @@ function buildDeckForPlayers(playerCount){
 
   if (playerCount <= 4){
     pushN(deck, 0, 1);
-    pushN(deck, 1, 2);
+    pushN(deck, 1, 1);
     pushN(deck, 2, 1);
     pushN(deck, 3, 1);
-    pushN(deck, 5, 1);
+    pushN(deck, 5, 0);
     pushN(deck, 4, 1);
     pushN(deck, 6, 1);
-    pushN(deck, 7, 1);
-    pushN(deck, 8, 1);
-    pushN(deck, 9, 1);
-    pushN(deck, 13, 1);
+    pushN(deck, 7, 2);
+    pushN(deck, 8, 4);
+    pushN(deck, 9, 4);
+    pushN(deck, 13, 0);
     return deck;
   }
 
@@ -6461,6 +6504,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/hands`), hands),
     set(ref(db, `rooms/${state.roomCode}/deck`), deckRaw.map(String)),
     set(ref(db, `rooms/${state.roomCode}/discard`), []),
+    set(ref(db, `rooms/${state.roomCode}/card1Spot`), null),
     set(ref(db, `rooms/${state.roomCode}/eliminated`), null),
     set(ref(db, `rooms/${state.roomCode}/turn`), { currentPlayerId:firstPlayerId, turnSeq:1, drawn:true, paused:false, updatedAt:Date.now() }),
     set(ref(db, `rooms/${state.roomCode}/investigation`), null),
@@ -6512,6 +6556,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/hands`)),
     remove(ref(db, `${base}/deck`)),
     remove(ref(db, `${base}/discard`)),
+    remove(ref(db, `${base}/card1Spot`)),
     remove(ref(db, `${base}/eliminated`)),
     remove(ref(db, `${base}/turn`)),
     remove(ref(db, `${base}/drawEvent`)),
