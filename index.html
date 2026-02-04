@@ -866,12 +866,31 @@
     flex-direction:column;
     align-items:center;
     gap:18px;
+    position:relative;
+  }
+  .arrest-yes-backdrop{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:min(62vw, 460px);
+    height:min(62vw, 460px);
+    max-width:460px;
+    max-height:460px;
+    background-image:url('dnyes.jpg');
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+    filter:drop-shadow(0 10px 22px rgba(0,0,0,.35));
+    z-index:0;
+    pointer-events:none;
   }
   .arrest-kira-card{
     position:relative;
     width:170px;
     height:250px;
     border-radius:12px;
+    z-index:1;
   }
   .arrest-kira-half{
     position:absolute;
@@ -892,19 +911,31 @@
     background:linear-gradient(130deg, rgba(255,255,255,.2), rgba(0,0,0,.12));
     mix-blend-mode:screen;
   }
-  .arrest-kira-overlay{
-    position:absolute;
-    left:50%;
-    top:50%;
-    width:150px;
-    height:150px;
-    transform:translate(-50%,-50%);
-    background-image:url('dnyes.jpg');
+  .center-image-overlay{
+    position:fixed;
+    inset:0;
+    display:grid;
+    place-items:center;
+    background:rgba(0,0,0,.35);
+    z-index:95;
+    pointer-events:none;
+  }
+  .center-image-overlay.hidden{ display:none; }
+  .center-image-overlay .center-image{
+    width:min(70vw, 520px);
+    height:min(70vw, 520px);
+    max-width:520px;
+    max-height:520px;
     background-size:contain;
     background-repeat:no-repeat;
     background-position:center;
-    filter:drop-shadow(0 10px 22px rgba(0,0,0,.35));
-    pointer-events:none;
+    filter:drop-shadow(0 18px 40px rgba(0,0,0,.35));
+  }
+  .center-image-overlay .center-image.gimei{
+    background-image:url('gimei.jpg');
+  }
+  .center-image-overlay .center-image.kekaku{
+    background-image:url('kekaku.jpg');
   }
   .arrest-kira-half.left{
     clip-path:polygon(0 0, 52% 0, 48% 100%, 0 100%);
@@ -1841,12 +1872,20 @@
 
 <div id="arrestYesOverlay" class="arrest-overlay hidden" aria-hidden="true">
   <div class="arrest-yes-stack">
+    <div class="arrest-yes-backdrop" aria-hidden="true"></div>
     <div class="arrest-kira-card">
       <div class="arrest-kira-half left"></div>
       <div class="arrest-kira-half right"></div>
-      <div class="arrest-kira-overlay" aria-hidden="true"></div>
     </div>
   </div>
+</div>
+
+<div id="gimeiOverlay" class="center-image-overlay hidden" aria-hidden="true">
+  <div class="center-image gimei"></div>
+</div>
+
+<div id="kekakuOverlay" class="center-image-overlay hidden" aria-hidden="true">
+  <div class="center-image kekaku"></div>
 </div>
 
 <div id="judgementPop" class="judgement-pop hidden">裁きの時間</div>
@@ -1967,13 +2006,15 @@ const REVEAL011_MOVE_MS = 520;
 const REVEAL011_SHUFFLE_MS = 560;
 const ARREST_OVERLAY_MS = 1800;
 const ARREST_NO_DRAW_DELAY_MS = 1000;
+const GIMEI_OVERLAY_MS = 1200;
+const KEKAKU_OVERLAY_MS = 1200;
 let localDirChoice = null;
 
 /* ★ 6（監視） */
 const WATCH6_MAX_AGE_MS = 60000;
 const WATCH6_CARD_SCALE = 110 / 60;
 /* ★ 3（偽名）表示 */
-const ALIAS3_DISPLAY_MS = 1800;
+const ALIAS3_DISPLAY_MS = GIMEI_OVERLAY_MS;
 
 const state = {
   userId: savedUserId,
@@ -2097,6 +2138,8 @@ const btnArrestYes = document.getElementById('btnArrestYes');
 const btnArrestNo = document.getElementById('btnArrestNo');
 const arrestNoOverlay = document.getElementById('arrestNoOverlay');
 const arrestYesOverlay = document.getElementById('arrestYesOverlay');
+const gimeiOverlay = document.getElementById('gimeiOverlay');
+const kekakuOverlay = document.getElementById('kekakuOverlay');
 
 /* ★ 裁き */
 const judgementPop = document.getElementById('judgementPop');
@@ -2154,6 +2197,7 @@ function buildCardFace(cardId, { size = '' } = {}){
   const info = getCardInfo(cardId);
   const face = document.createElement('div');
   face.className = `card-face${size ? ` ${size}` : ''}`;
+  const isMini = size === 'mini';
   if (info.id === '0'){
     face.classList.add('zero-card');
   }
@@ -2175,14 +2219,15 @@ function buildCardFace(cardId, { size = '' } = {}){
     image.style.backgroundImage = `url('${info.image}')`;
   }
 
-  const effect = document.createElement('div');
-  effect.className = 'card-effect';
-  effect.textContent = info.effect;
-
   face.appendChild(circle);
   face.appendChild(title);
   face.appendChild(image);
-  face.appendChild(effect);
+  if (!isMini){
+    const effect = document.createElement('div');
+    effect.className = 'card-effect';
+    effect.textContent = info.effect;
+    face.appendChild(effect);
+  }
 
   return face;
 }
@@ -2224,6 +2269,25 @@ function fitAllCardEffects(){
   document.querySelectorAll('.card-effect').forEach((effectEl) => {
     fitCardEffectText(effectEl);
   });
+}
+
+function showTimedOverlay(overlayEl, duration, timerRef){
+  if (!overlayEl) return;
+  overlayEl.classList.remove('hidden');
+  overlayEl.setAttribute('aria-hidden', 'false');
+  if (timerRef?.current){
+    clearTimeout(timerRef.current);
+  }
+  if (duration <= 0){
+    overlayEl.classList.add('hidden');
+    overlayEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  timerRef.current = setTimeout(() => {
+    overlayEl.classList.add('hidden');
+    overlayEl.setAttribute('aria-hidden', 'true');
+    timerRef.current = null;
+  }, duration);
 }
 
 function applyCardFace(cardEl, cardId, { size = '' } = {}){
@@ -2338,7 +2402,10 @@ let judgementLastTargetId = null;
 let lastJudgementNoZeroAt = null;
 let judgementFadeInMain = false;
 let lastAliasEventId = null;
+let lastKekakuEventId = null;
 let aliasRevealTimer = null;
+const gimeiOverlayTimer = { current: null };
+const kekakuOverlayTimer = { current: null };
 const JUDGEMENT_NOTE_DISPLAY_MS = 1500;
 
 function generateRoomCode(length = 6){
@@ -3141,6 +3208,7 @@ function subscribeAlias3Event(){
     renderHands();
     const elapsed = Number(now - Number(ev.at || now));
     const remaining = Math.max(0, ALIAS3_DISPLAY_MS - elapsed);
+    showTimedOverlay(gimeiOverlay, remaining, gimeiOverlayTimer);
     if (aliasRevealTimer){
       clearTimeout(aliasRevealTimer);
     }
@@ -3154,6 +3222,22 @@ function subscribeAlias3Event(){
       state.alias3Event = null;
       renderHands();
     }
+  });
+}
+
+function subscribeKekakuEvent(){
+  const evRef = ref(db, `rooms/${state.roomCode}/kekakuEvent`);
+  onValue(evRef, snap => {
+    const ev = snap.val();
+    if (!ev || !ev.id) return;
+    if (ev.id === lastKekakuEventId) return;
+    lastKekakuEventId = ev.id;
+
+    const now = Date.now();
+    if (ev.at && (now - ev.at) > 8000) return;
+    const elapsed = Number(now - Number(ev.at || now));
+    const remaining = Math.max(0, KEKAKU_OVERLAY_MS - elapsed);
+    showTimedOverlay(kekakuOverlay, remaining, kekakuOverlayTimer);
   });
 }
 
@@ -4555,6 +4639,7 @@ async function resolveArrest1Answer(answer){
   }
 
   const isNo = answer === 'no';
+  const shouldPause = isNo || answer === 'yes';
   const eventId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const updates = {};
   updates[`rooms/${state.roomCode}/arrest1`] = null;
@@ -4563,13 +4648,15 @@ async function resolveArrest1Answer(answer){
     type: answer,
     at: Date.now()
   };
-  updates[`rooms/${state.roomCode}/turn/paused`] = isNo;
+  updates[`rooms/${state.roomCode}/turn/paused`] = shouldPause;
   await update(ref(db, `/`), updates);
 
   if (isNo){
     await sleep(ARREST_OVERLAY_MS + ARREST_NO_DRAW_DELAY_MS);
   }
-  await advanceTurnToNextPlayer();
+  if (isNo){
+    await advanceTurnToNextPlayer();
+  }
 }
 
 btnArrestYes?.addEventListener('click', async (e) => {
@@ -4964,6 +5051,19 @@ async function finishJudgementNoZero(){
   });
 }
 
+async function shouldShowKekakuAfterElimination(){
+  if (!state.roomCode) return false;
+  const [handsSnap, elimSnap] = await Promise.all([
+    get(ref(db, `rooms/${state.roomCode}/hands`)),
+    get(ref(db, `rooms/${state.roomCode}/eliminated`))
+  ]);
+  const hands = handsSnap.val() || {};
+  const eliminated = elimSnap.val() || {};
+  const lPlayers = Object.entries(hands).filter(([, hand]) => hand?.identity === 'L' || hand?.identity === 'L2');
+  if (!lPlayers.length) return false;
+  return lPlayers.every(([playerId]) => !!eliminated?.[playerId]?.discardedAt);
+}
+
 async function resolveJudgementRevealSequence(revealedAt){
   if (!state.roomCode) return;
   const waitMs = Math.max(0, JUDGEMENT_NOTE_DISPLAY_MS - (Date.now() - Number(revealedAt || Date.now())));
@@ -4989,6 +5089,13 @@ async function resolveJudgementRevealSequence(revealedAt){
     }
 
     await sleep(1200);
+    const shouldShowKekaku = await shouldShowKekakuAfterElimination();
+    if (shouldShowKekaku){
+      await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
+      await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:true });
+      await emitKekakuEvent();
+      return;
+    }
     await set(ref(db, `rooms/${state.roomCode}/judgement`), null);
     await update(ref(db, `rooms/${state.roomCode}/turn`), { paused:false });
     await advanceTurnToNextPlayerWithDraw();
@@ -5634,6 +5741,15 @@ async function emitAlias3Event(targetId){
     id,
     targetId,
     card: '3',
+    at: Date.now()
+  });
+}
+
+async function emitKekakuEvent(){
+  if (!state.roomCode) return;
+  const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  await set(ref(db, `rooms/${state.roomCode}/kekakuEvent`), {
+    id,
     at: Date.now()
   });
 }
@@ -6284,6 +6400,7 @@ btnJoin.addEventListener('click', async () => {
   subscribeReveal011MoveEvent();
   subscribeDeckShuffleEvent();
   subscribeAlias3Event();
+  subscribeKekakuEvent();
 
   subscribeInvestigation();
   subscribeTransferEvent();
@@ -7308,6 +7425,7 @@ async function dealAllCardsAndInitialDraw(){
     set(ref(db, `rooms/${state.roomCode}/judgementMeta`), null),
     set(ref(db, `rooms/${state.roomCode}/alias3Event`), null),
     set(ref(db, `rooms/${state.roomCode}/alias3Used`), null),
+    set(ref(db, `rooms/${state.roomCode}/kekakuEvent`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Meta`), null),
     set(ref(db, `rooms/${state.roomCode}/arrest1Event`), null),
@@ -7363,6 +7481,7 @@ btnResetRoom.addEventListener('click', async () => {
     remove(ref(db, `${base}/judgementMeta`)),
     remove(ref(db, `${base}/alias3Event`)),
     remove(ref(db, `${base}/alias3Used`)),
+    remove(ref(db, `${base}/kekakuEvent`)),
     remove(ref(db, `${base}/arrest1`)),
     remove(ref(db, `${base}/arrest1Meta`)),
     remove(ref(db, `${base}/arrest1Event`)),
