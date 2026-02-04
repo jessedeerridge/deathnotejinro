@@ -1913,6 +1913,7 @@ let discardLoaded = false;
 let lastArrestEventId = null;
 let lastReveal011MoveEventId = null;
 let lastDeckShuffleEventId = null;
+const pendingReveal011Returns = new Map();
 
 let localPicked = null;
 let localExchangePicked = null;
@@ -2583,6 +2584,7 @@ function subscribeHands(){
   const handsRef = ref(db, `rooms/${state.roomCode}/hands`);
   onValue(handsRef, snap => {
     state.hands = snap.val() || {};
+    clearPendingReveal011Returns();
     renderHands();
   });
 }
@@ -2690,6 +2692,7 @@ function subscribeReveal011MoveEvent(){
 
     const pid = ev.playerId;
     if (!pid) return;
+    queueReveal011ReturnHide(pid);
     animateReveal011MoveToDeck(pid);
   });
 }
@@ -3919,6 +3922,11 @@ async function startReveal011Exchange(){
     await removeOneCardFromHandAtomic(myId, '1');
     await addCardToDeckAtomic('1');
 
+    await update(ref(db, `rooms/${state.roomCode}/reveal011`), {
+      phase: 'draw',
+      at: Date.now()
+    });
+
     let drawn = await drawOneFromDeckAtomic();
     if (!drawn){
       await reshuffleFromDiscardAndPauseTurn(myId, state.turn.turnSeq);
@@ -4835,7 +4843,8 @@ witnessBackdrop.addEventListener('click', (e) => {
 function renderMyHand(){
   const myId = state.userId;
   const handData = state.hands[myId];
-  const cards = Array.isArray(handData?.cards) ? handData.cards : [];
+  const rawCards = Array.isArray(handData?.cards) ? handData.cards : [];
+  const cards = getCardsWithReveal011Pending(myId, rawCards);
 
   const sig = JSON.stringify(cards);
 
@@ -4935,6 +4944,35 @@ function renderHands(){
   if (latestPlayers.length) renderPlayerCircle(latestPlayers);
   updateDeckUI();
   renderDiscardCenter();
+}
+
+function queueReveal011ReturnHide(playerId){
+  const cards = state.hands?.[playerId]?.cards;
+  const sig = JSON.stringify(Array.isArray(cards) ? cards : []);
+  pendingReveal011Returns.set(playerId, { sig, card:'1', at: Date.now() });
+  renderHands();
+}
+
+function clearPendingReveal011Returns(){
+  if (!pendingReveal011Returns.size) return;
+  for (const [playerId, pending] of pendingReveal011Returns.entries()){
+    const cards = state.hands?.[playerId]?.cards;
+    const sig = JSON.stringify(Array.isArray(cards) ? cards : []);
+    const age = Date.now() - Number(pending.at || 0);
+    if (sig !== pending.sig || age > 3000){
+      pendingReveal011Returns.delete(playerId);
+    }
+  }
+}
+
+function getCardsWithReveal011Pending(playerId, cards){
+  const pending = pendingReveal011Returns.get(playerId);
+  if (!pending || !Array.isArray(cards) || !cards.length) return Array.isArray(cards) ? cards : [];
+  const idx = cards.indexOf(pending.card);
+  if (idx < 0) return cards;
+  const copy = cards.slice();
+  copy.splice(idx, 1);
+  return copy;
 }
 
 /* =========================
@@ -5917,7 +5955,9 @@ function renderPlayerCircle(players){
   const arrestActive = !!arrest?.active;
   const isArrestByMe = arrestActive && arrest.phase === 'pickTarget' && arrest.by === state.userId;
   const reveal011 = state.reveal011;
-  const reveal011TargetId = (reveal011?.active && reveal011?.by) ? reveal011.by : null;
+  const reveal011TargetId = (reveal011?.active && reveal011?.by && reveal011?.phase === 'reveal')
+    ? reveal011.by
+    : null;
 
   players.forEach((p, idx) => {
     const k = (meIndex === -1) ? idx : (idx - meIndex + n) % n;
@@ -6018,6 +6058,8 @@ function renderPlayerCircle(players){
     }
 
     const handData = state.hands[p.id];
+    const rawHandCards = Array.isArray(handData?.cards) ? handData.cards : [];
+    const displayHandCards = getCardsWithReveal011Pending(p.id, rawHandCards);
     const eliminatedRecord = state.eliminated?.[p.id];
     const eliminated = isEliminated(p.id);
     const eliminatedIdentity = eliminatedRecord?.identity || handData?.identity || '？';
@@ -6028,14 +6070,13 @@ function renderPlayerCircle(players){
     let gun2RevealIdx = null;
     let gun2RevealCard = null;
     if (showGun2Reveal){
-      const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
       const pickIdx = Number(g?.targetPick?.idx);
       const pickCard = String(g?.targetPick?.card ?? '');
-      if (Number.isFinite(pickIdx) && pickIdx >= 0 && pickIdx < handCards.length){
+      if (Number.isFinite(pickIdx) && pickIdx >= 0 && pickIdx < rawHandCards.length){
         gun2RevealIdx = pickIdx;
-        gun2RevealCard = String(handCards[pickIdx] ?? pickCard);
+        gun2RevealCard = String(rawHandCards[pickIdx] ?? pickCard);
       } else {
-        const pos = handCards.indexOf(pickCard);
+        const pos = rawHandCards.indexOf(pickCard);
         if (pos >= 0){
           gun2RevealIdx = pos;
           gun2RevealCard = pickCard;
@@ -6044,8 +6085,7 @@ function renderPlayerCircle(players){
     }
     let aliasRevealIdx = null;
     if (showAliasReveal){
-      const handCards = Array.isArray(handData?.cards) ? handData.cards : [];
-      const aliasIdx = handCards.indexOf('3');
+      const aliasIdx = rawHandCards.indexOf('3');
       if (aliasIdx >= 0) aliasRevealIdx = aliasIdx;
     }
 
@@ -6062,7 +6102,7 @@ function renderPlayerCircle(players){
       tag.appendChild(idSlide);
     }
 
-    if (p.id !== state.userId && handData && Array.isArray(handData.cards) && handData.cards.length){
+    if (p.id !== state.userId && handData && displayHandCards.length){
       const reveal011Active = !!(reveal011TargetId && p.id === reveal011TargetId);
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
@@ -6114,11 +6154,11 @@ function renderPlayerCircle(players){
         }
       }
 
-      const count = handData.cards.length;
+      const count = displayHandCards.length;
       const spread = 70;
       const base = (count > 1) ? (-spread/2) : 0;
 
-      handData.cards.forEach((v, idx2) => {
+      displayHandCards.forEach((v, idx2) => {
         const card = document.createElement('div');
         card.className = 'mini-card';
         const angleDeg = (count > 1) ? base + (spread/(count-1))*idx2 : 0;
