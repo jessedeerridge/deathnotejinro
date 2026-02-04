@@ -444,8 +444,8 @@
   }
   .watch-card{
     position:absolute;
-    width:110px; height:165px;
-    border-radius:14px;
+    width:60px; height:90px;
+    border-radius:8px;
     border:1px solid rgba(0,0,0,.18);
     background:#111;
     display:flex;align-items:stretch;justify-content:stretch;
@@ -454,6 +454,21 @@
     user-select:none;
     color:#fff;
   }
+  .watch-target-tag{
+    position:fixed;
+    left:50%;
+    top:16px;
+    transform:translateX(-50%);
+    padding:4px 10px;
+    border-radius:999px;
+    background:#f8f8f8;
+    border:1px solid #ddd;
+    font-size:12px;
+    font-weight:700;
+    z-index:82;
+    white-space:nowrap;
+  }
+  .watch-target-tag.hidden{ display:none; }
 
   /* ★ 追加：6の表示中に「閉じてもいいですか？ はい」ポップ（画面下） */
   .watch-close-pop{
@@ -736,6 +751,22 @@
   }
   .gun2-confirm-pop.hidden{ display:none; }
   .gun2-confirm-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
+  .yesno-pop .dialog-buttons{
+    display:flex;
+    justify-content:flex-start;
+    gap:8px;
+  }
+  .yesno-pop .btn{
+    background:transparent;
+    color:#fff;
+    border-color:#fff;
+  }
+  .yesno-pop .btn[disabled],
+  .yesno-pop .btn.disabled{
+    background:#e5e7eb;
+    color:#fff;
+    border-color:#fff;
+  }
   .btn[disabled],
   .btn.disabled{
     background:#e5e7eb;
@@ -925,7 +956,7 @@
   .judgement-clock-hand.second{
     width:2px;
     height:52px;
-    transform:translate(-50%,-100%) rotate(336deg);
+    transform:translate(-50%,-100%) rotate(348deg);
     opacity:0.9;
   }
   .judgement-countdown-text{
@@ -1496,6 +1527,7 @@
 <div id="watchBackdrop" class="watch-backdrop hidden" aria-hidden="true">
   <div id="watchHand" class="watch-hand"></div>
 </div>
+<div id="watchTargetTag" class="watch-target-tag hidden" aria-hidden="true"></div>
 
 <!-- ★ 6：閉じる確認ポップ（使用者だけ） -->
 <div id="watchClosePop" class="watch-close-pop hidden" aria-hidden="true">
@@ -1527,20 +1559,20 @@
 </div>
 
 <!-- ★ 2：使用確認ポップ（使用者だけ） -->
-<div id="gun2ConfirmPop" class="gun2-confirm-pop hidden" aria-hidden="true">
+<div id="gun2ConfirmPop" class="gun2-confirm-pop hidden yesno-pop" aria-hidden="true">
   <div class="msg">2を使用しますか？</div>
   <div class="dialog-buttons">
-    <button id="btnGun2No" class="btn ghost">いいえ</button>
     <button id="btnGun2Yes" class="btn primary">はい</button>
+    <button id="btnGun2No" class="btn ghost">いいえ</button>
   </div>
 </div>
 
 <!-- ★ 1：逮捕（対象ポップ） -->
-<div id="arrestPop" class="arrest-pop hidden" aria-hidden="true">
+<div id="arrestPop" class="arrest-pop hidden yesno-pop" aria-hidden="true">
   <div class="msg">Are you Kira?</div>
   <div class="dialog-buttons">
-    <button id="btnArrestNo" class="btn ghost">No</button>
     <button id="btnArrestYes" class="btn primary">Yes</button>
+    <button id="btnArrestNo" class="btn ghost">No</button>
   </div>
 </div>
 
@@ -1596,11 +1628,11 @@
 </div>
 
 <div id="kickDialog" class="dialog-backdrop hidden">
-  <div class="dialog-box" id="kickDialogBox">
+  <div class="dialog-box yesno-pop" id="kickDialogBox">
     <p id="kickMessage">既存のプレイヤーを追い出して、着席しますか？</p>
     <div class="dialog-buttons">
-      <button class="btn ghost" id="btnKickNo">いいえ</button>
       <button class="btn primary" id="btnKickYes">はい</button>
+      <button class="btn ghost" id="btnKickNo">いいえ</button>
     </div>
   </div>
 </div>
@@ -1687,6 +1719,7 @@ const REVEAL011_SHUFFLE_MS = 560;
 
 /* ★ 6（監視） */
 const WATCH6_MAX_AGE_MS = 60000;
+const WATCH6_CARD_SCALE = 110 / 60;
 /* ★ 3（偽名）表示 */
 const ALIAS3_DISPLAY_MS = 1800;
 
@@ -1779,6 +1812,7 @@ const helpBody = document.getElementById('helpBody');
 /* ★ 6（監視）中央表示 */
 const watchBackdrop = document.getElementById('watchBackdrop');
 const watchHandEl = document.getElementById('watchHand');
+const watchTargetTag = document.getElementById('watchTargetTag');
 /* ★ 6：閉じる確認ポップ */
 const watchClosePop = document.getElementById('watchClosePop');
 const btnWatchCloseYes = document.getElementById('btnWatchCloseYes');
@@ -1815,6 +1849,7 @@ const judgementPop = document.getElementById('judgementPop');
 const judgementFade = document.getElementById('judgementFade');
 const judgementMessage = document.getElementById('judgementMessage');
 const judgementCountdownText = document.getElementById('judgementCountdownText');
+const judgementSecondHand = judgementMessage?.querySelector('.judgement-clock-hand.second') || null;
 const judgementNotebook = document.getElementById('judgementNotebook');
 const judgementCanvas = document.getElementById('judgementCanvas');
 const judgementTargetPop = document.getElementById('judgementTargetPop');
@@ -3597,6 +3632,10 @@ function getWatch6(){
   return (state.surveillance6 && typeof state.surveillance6 === 'object') ? state.surveillance6 : null;
 }
 
+function getPlayerNameById(playerId){
+  return latestPlayers.find((p) => p.id === playerId)?.name || '対象プレイヤー';
+}
+
 async function startSurveillance6(byPlayerId){
   if (!state.roomCode) return;
 
@@ -3656,6 +3695,7 @@ function renderWatchCenterHand(targetId){
   const count = cards.length;
   const stepX = 92;
   const stepRot = 6;
+  const scale = WATCH6_CARD_SCALE;
   const center = (count - 1) / 2;
 
   cards.forEach((v, i) => {
@@ -3667,7 +3707,7 @@ function renderWatchCenterHand(targetId){
     const rot = (i - center) * stepRot;
     const dy = Math.abs(i - center) * 2;
 
-    card.style.transform = `translate(-50%,-50%) translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+    card.style.transform = `translate(-50%,-50%) translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(${scale})`;
     card.style.zIndex = String(10 + i);
     watchHandEl.appendChild(card);
   });
@@ -3679,6 +3719,8 @@ function syncWatchCenterOverlay(){
 
   watchClosePop.classList.add('hidden');
   watchClosePop.setAttribute('aria-hidden', 'true');
+  watchTargetTag?.classList.add('hidden');
+  watchTargetTag?.setAttribute('aria-hidden', 'true');
 
   if (!iAmBy){
     watchBackdrop.classList.add('hidden');
@@ -3699,6 +3741,11 @@ function syncWatchCenterOverlay(){
 
   watchClosePop.classList.remove('hidden');
   watchClosePop.setAttribute('aria-hidden', 'false');
+  if (watchTargetTag){
+    watchTargetTag.textContent = getPlayerNameById(w.targetId);
+    watchTargetTag.classList.remove('hidden');
+    watchTargetTag.setAttribute('aria-hidden', 'false');
+  }
 }
 
 /* ★ 6：画面下「はい」で閉じる → ターン終了 */
@@ -4258,6 +4305,16 @@ function showJudgementWritePop(show){
   judgementWritePop.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
 
+function setJudgementSecondHandPosition(remaining){
+  if (!judgementSecondHand) return;
+  let seconds = 60;
+  if (remaining === 3) seconds = 58;
+  if (remaining === 2) seconds = 59;
+  if (remaining === 1) seconds = 60;
+  const degrees = (seconds % 60) * 6;
+  judgementSecondHand.style.transform = `translate(-50%,-100%) rotate(${degrees}deg)`;
+}
+
 function openJudgementNotebook(enableDraw){
   if (!judgementNotebook) return;
   judgementNotebook.classList.remove('hidden');
@@ -4292,6 +4349,7 @@ function syncJudgementUI(){
   const j = getJudgement();
   const hasActive = !!j?.active;
   const isActiveKira = !!(hasActive && j.kiraId === state.userId);
+  setJudgementSecondHandPosition(null);
   const isKiraSelectionPhase = isActiveKira && (
     j.phase === 'select'
     || j.phase === 'writing'
@@ -4344,6 +4402,7 @@ function syncJudgementUI(){
     const startedAt = Number(j.countdownStartedAt || j.at || Date.now());
     const elapsed = Date.now() - startedAt;
     const remaining = Math.max(0, 3 - Math.floor(elapsed / 1000));
+    setJudgementSecondHandPosition(remaining);
     const shouldShowCountdown = j.countdownMode === 'postWrite' ? true : !j.kiraHasZero;
     if (remaining > 0){
       showJudgementMessage(shouldShowCountdown, `${remaining}..`);
