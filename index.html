@@ -517,7 +517,7 @@
   .watch-close-pop .msg{ font-weight:900; font-size:13px; white-space:nowrap; }
 
   /* =========================================================
-     ★追加：5（証人） UI
+     ★追加：5（目撃） UI
      - 使用者だけ：各プレイヤー扇手札の左に「正体カード裏(24x33)」を1枚表示→大小パルス→クリックで対象選択
      - 他プレイヤー＆対象：使用者ネームタグ → 対象の正体カード裏 へ点線矢印＋👀
      - 使用者だけ：対象の手札を中央に拡大表示
@@ -1747,7 +1747,7 @@
       <svg id="gun2Layer" class="gun2-layer"></svg>
       <!-- ★ 6：監視 点線矢印＋👀 用SVG -->
       <svg id="watchLayer" class="watch-layer"></svg>
-      <!-- ★ 5：証人 点線矢印＋👀 用SVG -->
+      <!-- ★ 5：目撃 点線矢印＋👀 用SVG -->
       <svg id="witnessLayer" class="witness-layer"></svg>
     </div>
 
@@ -1884,7 +1884,7 @@
 <div id="helpBackdrop" class="help-pop-backdrop hidden">
   <div class="help-pop" role="dialog" aria-modal="true" aria-label="カード一覧">
     <div class="help-pop-header">
-      <div class="help-pop-title">ヘルプ</div>
+      <div class="help-pop-title">カード</div>
       <button id="btnHelpClose" class="btn ghost" style="padding:2px 6px;font-size:12px;">×</button>
     </div>
     <div class="help-pop-body" id="helpBody"></div>
@@ -1906,7 +1906,7 @@
     ★ 変更：<b>9（尋問）</b> を使ったら、まず <b>右/左</b> をボタンで選択 → 全員が <b>最小カード</b> をクリック選択 → 一斉受け渡し。<br>
     ★ 変更：<b>8（交換）</b>：対象を選択→対象が最小カードを選ぶ→8使用者に移動→8使用者が返す1枚を選ぶ→対象へ移動。<br>
     ★ 追加：<b>6（監視）</b>：対象プレイヤーを選択→対象の手札を中央に拡大表示（使用者のみ）／他プレイヤーと対象には点線矢印＋👀。<br>
-    ★ 追加：<b>5（証人）</b>：使用者だけが各プレイヤーの左に正体カード裏を出して選択→対象の手札を中央に拡大（使用者のみ）／他プレイヤーと対象には点線矢印＋👀。<br>
+    ★ 追加：<b>5（目撃）</b>：使用者だけが各プレイヤーの左に正体カード裏を出して選択→対象の手札を中央に拡大（使用者のみ）／他プレイヤーと対象には点線矢印＋👀。<br>
     ★ 追加：<b>2（拳銃）</b>：使用者が対象を選択→対象が最小カードを選択→扇手札で表向き拡大（4秒）→次の手番。<br>
     ★ 変更：<b>9/8 の移動アニメは裏面・デッキサイズ</b>。<br>
     ★ 修正：<b>同じ数字が複数あっても、クリックした1枚だけ選ばれる</b>（indexで管理）。
@@ -1973,7 +1973,7 @@ const state = {
   investigation: null,
   exchange8: null,
   surveillance6: null, // ★ 6（監視）
-  witness5: null,      // ★ 5（証人）
+  witness5: null,      // ★ 5（目撃）
   vote7: null,         // ★ 7（投票）
   shinigami13: null,   // ★ 13（死神）
   gun2: null,          // ★ 2（拳銃）
@@ -2050,7 +2050,7 @@ const watchTargetTag = document.getElementById('watchTargetTag');
 const watchClosePop = document.getElementById('watchClosePop');
 const btnWatchCloseYes = document.getElementById('btnWatchCloseYes');
 
-/* ★ 5（証人）中央表示 */
+/* ★ 5（目撃）中央表示 */
 const witnessBackdrop = document.getElementById('witnessBackdrop');
 const witnessHandEl = document.getElementById('witnessHand');
 /* ★ 5：閉じる確認 */
@@ -2099,7 +2099,7 @@ const CARD_LIBRARY = [
   { id: "2", name: "拳銃", effect: "選ばれたプレイヤーは全員に数字を変えずに小さいカードを見せる。警察しか使えない。", image: "拳銃.jpg" },
   { id: "3", name: "偽名", effect: "ノートに名前を書かれても一度だけ死なない。", image: "偽名.jpg" },
   { id: "4", name: "アリバイ", effect: "このカードがあれば、あなたがキラでも一度だけ逮捕されない。その時にこのカードは見せない。", image: "アリバイ.jpg" },
-  { id: "5", name: "証人", effect: "選んだプレイヤーの正体カードをこっそり見る。", image: "証人.jpg" },
+  { id: "5", name: "目撃", effect: "選んだプレイヤーの正体カードをこっそり見る。", image: "目撃.jpg" },
   { id: "6", name: "監視", effect: "選んだプレイヤーの手札カードをこっそり見る。", image: "監視.jpg" },
   { id: "7", name: "投票", effect: "全員同時にキラだと思うプレイヤーを指さす。", image: "投票.jpg" },
   { id: "8", name: "交換", effect: "選んだプレイヤーから最小を受け取った後、好きなカードを渡す。", image: "交換.jpg" },
@@ -2366,7 +2366,7 @@ function watchPhase(){ return String(state.surveillance6?.phase || ''); }
 function isWatchPickingTarget(){ return isWatchActive() && watchPhase() === 'pickTarget'; }
 function isWatchShowing(){ return isWatchActive() && watchPhase() === 'show'; }
 
-/* ★ 5（証人） */
+/* ★ 5（目撃） */
 function isWitnessActive(){ return !!state.witness5?.active; }
 function witnessPhase(){ return String(state.witness5?.phase || ''); }
 function isWitnessPickingTarget(){ return isWitnessActive() && witnessPhase() === 'pickTarget'; }
@@ -3231,7 +3231,7 @@ function subscribeSurveillance6(){
   });
 }
 
-/* ★ 5（証人）購読 */
+/* ★ 5（目撃）購読 */
 function subscribeWitness5(){
   const wiRef = ref(db, `rooms/${state.roomCode}/witness5`);
   onValue(wiRef, snap => {
@@ -3520,7 +3520,7 @@ function canPickAnyForMinSelection(identity, cards){
   if (role === 'キラ'){
     return hasCard(0);
   }
-  if (role === 'L' || role === 'L2' || role === 'ワタリ' || role === 'Watari'){
+  if (role === 'L' || role === 'L2' || role === 'ワタリ'){
     return hasCard(1);
   }
   if (role === '警察1' || role === '警察2'){
@@ -4066,7 +4066,7 @@ watchBackdrop.addEventListener('click', (e) => {
 });
 
 /* =========================
-   ★ 5（証人）状態機械
+   ★ 5（目撃）状態機械
    ========================= */
 function getWitness5(){
   return (state.witness5 && typeof state.witness5 === 'object') ? state.witness5 : null;
@@ -4758,7 +4758,7 @@ function syncJudgementUI(){
     const triggerAt = Number(j.noZeroAt || j.at || Date.now());
     if (lastJudgementNoZeroAt === triggerAt) return;
     lastJudgementNoZeroAt = triggerAt;
-    showJudgementPop('裁きの時間は行われませんでした。');
+    showJudgementPop('裁きは行われませんでした。');
     setTimeout(() => {
       setJudgementFade(false);
       finishJudgementNoZero().catch(console.warn);
@@ -6237,7 +6237,7 @@ btnJoin.addEventListener('click', async () => {
 
   // ★ 6（監視）
   subscribeSurveillance6();
-  // ★ 5（証人）
+  // ★ 5（目撃）
   subscribeWitness5();
   // ★ 7（投票）
   subscribeVote7();
@@ -6698,7 +6698,7 @@ function renderPlayerCircle(players){
       tag.classList.add('judgement-self-hidden');
     }
 
-    /* ★ 5（証人）：対象選択（使用者だけ）
+    /* ★ 5（目撃）：対象選択（使用者だけ）
        - 各プレイヤーの「扇手札の左」に 正体カード裏 1枚を表示
        - クリックで対象選択
     */
@@ -6740,6 +6740,9 @@ function renderPlayerCircle(players){
     const showShinigamiReveal = !!(canSeeShinigami() && sh?.active && sh?.phase === 'show' && sh?.targetId === p.id);
     const showGun2Reveal = !!(g?.active && g?.phase === 'show' && g?.targetId === p.id && g?.targetPick);
     const showAliasReveal = !!(state.alias3Event && state.alias3Event.targetId === p.id);
+    const isWatari = myIdentity === 'ワタリ' || myIdentity === 'Watari';
+    const shouldShowWatariReveal = isWatari && (handData?.identity === 'L' || handData?.identity === 'L2');
+    const shouldShowIdentityMini = shouldRevealIdentity || shouldShowWatariReveal;
     let gun2RevealIdx = null;
     let gun2RevealCard = null;
     if (showGun2Reveal){
@@ -6827,7 +6830,7 @@ function renderPlayerCircle(players){
         }
       }
 
-      if (shouldRevealIdentity && p.id !== state.userId){
+      if (shouldShowIdentityMini && p.id !== state.userId){
         const revealCard = document.createElement('div');
         revealCard.className = 'revealed-identity-card';
         applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -6917,7 +6920,7 @@ function renderPlayerCircle(players){
           await pickWitness5Target(p.id);
         });
         miniHand.appendChild(idBack);
-        if (shouldRevealIdentity && p.id !== state.userId){
+        if (shouldShowIdentityMini && p.id !== state.userId){
           const revealCard = document.createElement('div');
           revealCard.className = 'revealed-identity-card';
           applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -6950,7 +6953,7 @@ function renderPlayerCircle(players){
           await pickArrest1Target(p.id);
         });
         miniHand.appendChild(arrestCard);
-        if (shouldRevealIdentity && p.id !== state.userId){
+        if (shouldShowIdentityMini && p.id !== state.userId){
           const revealCard = document.createElement('div');
           revealCard.className = 'revealed-identity-card';
           applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -6987,7 +6990,7 @@ function renderPlayerCircle(players){
         const miniCircle = document.createElement('div');
         miniCircle.className = 'mini-hand-circle';
         miniHand.appendChild(miniCircle);
-        if (shouldRevealIdentity && p.id !== state.userId){
+        if (shouldShowIdentityMini && p.id !== state.userId){
           const revealCard = document.createElement('div');
           revealCard.className = 'revealed-identity-card';
           applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -7024,7 +7027,7 @@ function renderPlayerCircle(players){
           idBack.style.cursor = 'default';
           idBack.style.pointerEvents = 'none';
           miniHand.appendChild(idBack);
-          if (shouldRevealIdentity && p.id !== state.userId){
+          if (shouldShowIdentityMini && p.id !== state.userId){
             const revealCard = document.createElement('div');
             revealCard.className = 'revealed-identity-card';
             applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -7048,13 +7051,13 @@ function renderPlayerCircle(players){
       }
     }
 
-    if ((shouldRevealIdentity || canPickJudgementTarget) && p.id !== state.userId && !tag.querySelector('.mini-hand')){
+    if ((shouldShowIdentityMini || canPickJudgementTarget) && p.id !== state.userId && !tag.querySelector('.mini-hand')){
       const miniHand = document.createElement('div');
       miniHand.className = 'mini-hand';
       const miniCircle = document.createElement('div');
       miniCircle.className = 'mini-hand-circle';
       miniHand.appendChild(miniCircle);
-      if (shouldRevealIdentity){
+      if (shouldShowIdentityMini){
         const revealCard = document.createElement('div');
         revealCard.className = 'revealed-identity-card';
         applyIdentityCardFace(revealCard, handData?.identity || '');
@@ -7183,9 +7186,9 @@ function buildDeckForPlayers(playerCount){
 
 function buildIdentityDeck(playerCount){
   const roles = ["キラ","L","警察1","警察2"];
-  if (playerCount === 5) roles.push("信者");
-  if (playerCount === 6) roles.push("L2");
-  if (playerCount === 7) roles.push("ワタリ");
+  if (playerCount >= 5) roles.push("信者");
+  if (playerCount >= 6) roles.push("L2");
+  if (playerCount >= 7) roles.push("ワタリ");
   let policeIndex = 3;
   while (roles.length < playerCount) roles.push(`警察${policeIndex++}`);
   return roles.slice(0, playerCount);
