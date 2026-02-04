@@ -5658,8 +5658,9 @@ function shuffleWithTopGuarantees(deck, topCount, requiredCards){
 
   requiredCards.forEach((cardId) => {
     const card = String(cardId);
-    if (deck.slice(0, limit).includes(card)) return;
-    const idx = deck.indexOf(card);
+    const hasCardInTop = deck.slice(0, limit).some((v) => String(v) === card);
+    if (hasCardInTop) return;
+    const idx = deck.findIndex((v) => String(v) === card);
     if (idx < 0) return;
     const swapIndex = Math.floor(Math.random() * limit);
     [deck[swapIndex], deck[idx]] = [deck[idx], deck[swapIndex]];
@@ -7263,7 +7264,7 @@ async function dealAllCardsAndInitialDraw(){
   if (playerCount <= 0) return;
 
   const deckRaw = buildDeckForPlayers(playerCount);
-  shuffleWithTopGuarantees(deckRaw, playerCount, ['0', '1']);
+  shuffleWithTopGuarantees(deckRaw, playerCount * 2, ['0', '1']);
 
   const idDeck = buildIdentityDeck(playerCount);
   shuffleInPlace(idDeck);
