@@ -1283,11 +1283,10 @@
     position:relative;
     color:#fff;
   }
-  .help-deck-card .card-effect{visibility:hidden;}
   .help-deck-count{
     position:absolute;
-    right:4px;
-    top:4px;
+    right:2px;
+    top:2px;
     padding:1px 6px;
     min-width:18px;
     border-radius:999px;
@@ -2185,7 +2184,7 @@ function renderHelpList(){
     applyCardFace(card, cardInfo.id);
     const countTag = document.createElement('div');
     countTag.className = 'help-deck-count';
-    countTag.textContent = `×${count}`;
+    countTag.textContent = `${count}`;
     card.appendChild(countTag);
     deckGrid.appendChild(card);
   });
