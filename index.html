@@ -63,11 +63,20 @@
   }
   .player-circle::before{content:'';}
   .player-tag{
-    position:absolute;transform:translate(-50%,-50%);
-    padding:4px 8px;border-radius:999px;background:#f8f8f8;
-    border:1px solid #ddd;font-size:12px;white-space:nowrap;
+    position:absolute;
+    transform:translate(-50%,-50%);
   }
-  .player-tag.me{ background:#111;color:#fff;border-color:#111; }
+  .player-label{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#f8f8f8;
+    border:1px solid #ddd;
+    font-size:12px;
+    white-space:nowrap;
+    transform-origin:center;
+  }
+  .player-tag.me .player-label{ background:#111;color:#fff;border-color:#111; }
   .player-tag .player-name{ display:inline-block; }
 
   .center-area{
@@ -95,7 +104,7 @@
   /* ★ センター捨て札スタック（表向きで積み上げ） */
   .discard-stack{
     position:absolute;
-    left:50%; top:50%;
+    left:50%; top:calc(50% + 8px);
     transform:translate(-50%,-50%);
     width:0; height:0;
     z-index:11;
@@ -457,8 +466,8 @@
   .watch-target-tag{
     position:fixed;
     left:50%;
-    top:16px;
-    transform:translateX(-50%);
+    top:50%;
+    transform:translate(-50%,-150px);
     padding:4px 10px;
     border-radius:999px;
     background:#f8f8f8;
@@ -1367,6 +1376,20 @@
     pointer-events:none;
   }
   .exchange-pop.hidden{display:none;}
+  .exchange-return-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);color:#fff;
+    padding:10px 12px;border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    z-index:66;
+    font-weight:900;
+    white-space:nowrap;
+    pointer-events:none;
+  }
+  .exchange-return-pop.hidden{display:none;}
 
   /* ★ 5：ポップ（対象選択中） */
   .witness-pop{
@@ -1436,14 +1459,16 @@
 
   /* ★ 7：投票タグアニメ */
   @keyframes voteTagPulse{
-    0%  { transform:translate(-50%,-50%) scale(1); }
-    50% { transform:translate(-50%,-50%) scale(1.08); }
-    100%{ transform:translate(-50%,-50%) scale(1); }
+    0%  { transform:scale(1); }
+    50% { transform:scale(1.08); }
+    100%{ transform:scale(1); }
   }
   .player-tag.vote7-targetable{
     cursor:pointer;
-    animation: voteTagPulse 820ms ease-in-out infinite;
     box-shadow:0 0 0 2px rgba(17,17,17,.12);
+  }
+  .player-tag.vote7-targetable .player-label{
+    animation: voteTagPulse 820ms ease-in-out infinite;
   }
   .player-tag.vote7-voted{
     outline:2px solid #111;
@@ -1617,6 +1642,7 @@
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
+<div id="exchangeReturnPop" class="exchange-return-pop hidden">手札から渡したいカードを選んでください。</div>
 <div id="witnessPop" class="witness-pop hidden">5の効果：正体カード（裏）をクリックして対象選択</div>
 <div id="votePop" class="vote-pop hidden">7の効果：投票するプレイヤーを選択</div>
 
@@ -1766,6 +1792,7 @@ const copyLinkBtn = document.getElementById('copyLinkBtn');
 const hostSelectingPop = document.getElementById('hostSelectingPop');
 const pickPop = document.getElementById('pickPop');
 const exchangePop = document.getElementById('exchangePop');
+const exchangeReturnPop = document.getElementById('exchangeReturnPop');
 const witnessPop = document.getElementById('witnessPop');
 const votePop = document.getElementById('votePop');
 
@@ -2198,6 +2225,17 @@ function clearLinkLayer(){ clearSvgLayer(linkLayer); }
 function getPlayerTagEl(playerId){
   return playerCircle.querySelector(`.player-tag[data-pid="${playerId}"]`);
 }
+function getExchangeAnchorRect(playerId, useMiniCard){
+  const tag = getPlayerTagEl(playerId);
+  if (!tag) return null;
+  if (useMiniCard){
+    const miniCard = tag.querySelector('.mini-card');
+    if (miniCard) return miniCard.getBoundingClientRect();
+    const miniHand = tag.querySelector('.mini-hand');
+    if (miniHand) return miniHand.getBoundingClientRect();
+  }
+  return tag.getBoundingClientRect();
+}
 
 function updateExchangeLink(){
   if (!linkLayer) return;
@@ -2225,8 +2263,12 @@ function updateExchangeLink(){
   }
 
   const pcRect = playerCircle.getBoundingClientRect();
-  const br = byEl.getBoundingClientRect();
-  const tr = tgEl.getBoundingClientRect();
+  const br = getExchangeAnchorRect(byId, false);
+  const tr = getExchangeAnchorRect(targetId, targetId !== state.userId);
+  if (!br || !tr){
+    clearLinkLayer();
+    return;
+  }
 
   const x1 = (br.left + br.width/2) - pcRect.left;
   const y1 = (br.top  + br.height/2) - pcRect.top;
@@ -2578,18 +2620,31 @@ function updateTurnUI(){
   const exActive = isExchangeActive();
   if (!exActive){
     exchangePop.classList.add('hidden');
+    exchangeReturnPop.classList.add('hidden');
   } else {
-    exchangePop.classList.remove('hidden');
     const ex = state.exchange8;
+    const isBy = ex?.by === state.userId;
+    const isTarget = ex?.targetId === state.userId;
+    let showTopPop = true;
+    exchangeReturnPop.classList.add('hidden');
     if (ex?.phase === 'pickTarget'){
       exchangePop.textContent = '8の効果：対象プレイヤーを選択';
     } else if (ex?.phase === 'targetPickMin'){
-      exchangePop.textContent = '8の効果：対象が最小カードを選択中';
+      exchangePop.textContent = isTarget
+        ? '8の効果：小さいほうのカードを選んで、相手に渡してください。'
+        : '8の効果：対象が最小カードを選択中';
     } else if (ex?.phase === 'byPickReturn'){
-      exchangePop.textContent = '8の効果：返すカードを選択';
+      if (isBy){
+        showTopPop = false;
+        exchangeReturnPop.textContent = '手札から渡したいカードを選んでください。';
+        exchangeReturnPop.classList.remove('hidden');
+      } else {
+        exchangePop.textContent = '8の効果：返すカードを選択中';
+      }
     } else {
       exchangePop.textContent = '8の効果：処理中';
     }
+    exchangePop.classList.toggle('hidden', !showTopPop);
   }
 
   // 5 pop
@@ -2608,7 +2663,7 @@ function updateTurnUI(){
     const myVoted = !!(state.vote7?.votes && state.vote7.votes[state.userId]);
     if (vPhase === 'voting'){
       votePop.textContent = myVoted
-        ? '7の効果：他プレイヤーが投票中'
+        ? '7の効果：投票先を選び直せます'
         : '7の効果：投票するプレイヤーを選択';
     } else {
       votePop.textContent = '7の効果：投票結果表示中';
@@ -4862,7 +4917,11 @@ async function pickVote7Target(targetId){
   if (v.phase !== 'voting') return;
   const myId = state.userId;
   if (!targetId || targetId === myId) return;
-  if (v.votes && v.votes[myId]) return;
+  const players = await getSeatedPlayers();
+  if (!players.length) return;
+  const votes = v.votes || {};
+  const allVoted = players.every(p => votes[p.id]);
+  if (allVoted) return;
 
   await set(ref(db, `rooms/${state.roomCode}/vote7/votes/${myId}`), targetId);
 
@@ -6086,6 +6145,7 @@ function renderPlayerCircle(players){
   const vPhase = vote7Phase();
   const vVotes = state.vote7?.votes || {};
   const iHaveVoted = !!vVotes[state.userId];
+  const allVoted = vActive && vPhase === 'voting' && players.every(p => vVotes[p.id]);
   const showVotedStatus = vActive && vPhase === 'voting' && iHaveVoted;
   const voteResults = (vActive && vPhase === 'reveal') ? buildVote7Results(state.vote7, players) : {};
   const playerNameMap = new Map(players.map(p => [p.id, p.name]));
@@ -6112,10 +6172,13 @@ function renderPlayerCircle(players){
     tag.style.left = `${x}%`;
     tag.style.top  = `${y}%`;
     tag.dataset.pid = p.id;
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'player-label';
     const nameSpan = document.createElement('span');
     nameSpan.className = 'player-name';
     nameSpan.textContent = p.name;
-    tag.appendChild(nameSpan);
+    labelSpan.appendChild(nameSpan);
+    tag.appendChild(labelSpan);
 
     if (reveal011TargetId && p.id === reveal011TargetId && p.id !== state.userId){
       tag.classList.add('reveal011-hand');
@@ -6186,7 +6249,7 @@ function renderPlayerCircle(players){
 
     /* ★ 7（投票）：対象選択（全員） */
     if (vActive && vPhase === 'voting'){
-      if (!iHaveVoted && p.id !== state.userId){
+      if (!allVoted && p.id !== state.userId){
         tag.classList.add('vote7-targetable');
         tag.addEventListener('click', async () => {
           await pickVote7Target(p.id);
