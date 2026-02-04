@@ -1134,7 +1134,8 @@
     justify-content:center;
   }
   .identity-card-face{
-    background-size:cover;
+    background-size:contain;
+    background-repeat:no-repeat;
     background-position:center;
     color:#fff;
     text-shadow:0 1px 2px rgba(0,0,0,.45);
@@ -1556,6 +1557,14 @@
   }
   .player-tag .judgement-pick-card{
     margin-left:-40px;
+  }
+  .judgement-pick-card.identity-card-face,
+  .revealed-identity-card.identity-card-face,
+  .judgement-id-face.identity-card-face,
+  .eliminated-identity-card.identity-card-face{
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
   }
   /* ★ 裁き後：信者/キラの正体カード常時表示 */
   .revealed-identity-card{
@@ -6718,6 +6727,12 @@ function renderPlayerCircle(players){
     const eliminatedRecord = state.eliminated?.[p.id];
     const eliminatedIdentity = eliminatedRecord?.identity || handData?.identity || '？';
     const eliminatedDiscardedAt = eliminatedRecord?.discardedAt || null;
+    const kiraCanSeeFollower = !!(
+      myIdentity === 'キラ'
+      && handData?.identity === '信者'
+      && j?.active
+      && j.phase === 'select'
+    );
     const shouldRevealIdentity = judgementRevealed && (
       (myIdentity === 'キラ' && handData?.identity === '信者')
       || (myIdentity === '信者' && handData?.identity === 'キラ')
@@ -6823,6 +6838,9 @@ function renderPlayerCircle(players){
         const pickCard = document.createElement('div');
         pickCard.className = 'judgement-pick-card';
         pickCard.title = '正体カード（裏）';
+        if (kiraCanSeeFollower){
+          applyIdentityCardFace(pickCard, handData?.identity || '');
+        }
         pickCard.addEventListener('click', async (e) => {
           e.stopPropagation();
           await pickJudgementTarget(p.id);
@@ -6909,6 +6927,9 @@ function renderPlayerCircle(players){
           const pickCard = document.createElement('div');
           pickCard.className = 'judgement-pick-card';
           pickCard.title = '正体カード（裏）';
+          if (kiraCanSeeFollower){
+            applyIdentityCardFace(pickCard, handData?.identity || '');
+          }
           pickCard.addEventListener('click', async (e) => {
             e.stopPropagation();
             await pickJudgementTarget(p.id);
@@ -6939,6 +6960,9 @@ function renderPlayerCircle(players){
           const pickCard = document.createElement('div');
           pickCard.className = 'judgement-pick-card';
           pickCard.title = '正体カード（裏）';
+          if (kiraCanSeeFollower){
+            applyIdentityCardFace(pickCard, handData?.identity || '');
+          }
           pickCard.addEventListener('click', async (e) => {
             e.stopPropagation();
             await pickJudgementTarget(p.id);
@@ -6973,6 +6997,9 @@ function renderPlayerCircle(players){
           const pickCard = document.createElement('div');
           pickCard.className = 'judgement-pick-card';
           pickCard.title = '正体カード（裏）';
+          if (kiraCanSeeFollower){
+            applyIdentityCardFace(pickCard, handData?.identity || '');
+          }
           pickCard.addEventListener('click', async (e) => {
             e.stopPropagation();
             await pickJudgementTarget(p.id);
@@ -7007,6 +7034,9 @@ function renderPlayerCircle(players){
             const pickCard = document.createElement('div');
             pickCard.className = 'judgement-pick-card';
             pickCard.title = '正体カード（裏）';
+            if (kiraCanSeeFollower){
+              applyIdentityCardFace(pickCard, handData?.identity || '');
+            }
             pickCard.addEventListener('click', async (e) => {
               e.stopPropagation();
               await pickJudgementTarget(p.id);
@@ -7034,6 +7064,9 @@ function renderPlayerCircle(players){
         const pickCard = document.createElement('div');
         pickCard.className = 'judgement-pick-card';
         pickCard.title = '正体カード（裏）';
+        if (kiraCanSeeFollower){
+          applyIdentityCardFace(pickCard, handData?.identity || '');
+        }
         pickCard.addEventListener('click', async (e) => {
           e.stopPropagation();
           await pickJudgementTarget(p.id);
