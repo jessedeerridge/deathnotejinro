@@ -1257,6 +1257,7 @@
 
   /* ★縦の詰まりも少し強める */
   gap:1px;
+  --card-title-height:12px;
 
   width:100%;
   height:100%;
@@ -1331,9 +1332,10 @@
   line-height:1.15;
   margin-top:0px;
 }
-  .card-face.mini{
+.card-face.mini{
     gap:2px;
     padding:3px;
+    --card-title-height:6px;
   }
 
 
@@ -1360,6 +1362,13 @@
   }
   .card-face.zero-card .card-image{
     border:none;
+  }
+  .card-face.zero-card .card-title{
+    visibility:hidden;
+    min-height:var(--card-title-height);
+  }
+  .card-face.zero-card .card-image{
+    margin-top:calc(var(--card-title-height) * -1);
   }
 
 
@@ -1993,7 +2002,7 @@ function buildCardFace(cardId, { size = '' } = {}){
 
   const title = document.createElement('div');
   title.className = 'card-title';
-  title.textContent = info.name;
+  title.textContent = info.id === '0' ? '' : info.name;
 
   const image = document.createElement('div');
   image.className = 'card-image';
