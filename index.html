@@ -96,7 +96,7 @@
   .discard-stack{
     position:absolute;
     left:50%; top:50%;
-    transform:translate(-50%,-50%);
+    transform:translate(-50%,-50%) translateY(8px);
     width:0; height:0;
     z-index:11;
     pointer-events:none;
@@ -442,6 +442,23 @@
     width:0; height:0;
     pointer-events:none;
   }
+  .watch-name-tag{
+    position:absolute;
+    left:50%;
+    top:calc(50% - 130px);
+    transform:translate(-50%,-50%);
+    padding:4px 10px;
+    border-radius:999px;
+    border:1px solid #ddd;
+    background:#fff;
+    font-size:13px;
+    font-weight:700;
+    box-shadow:0 10px 22px rgba(0,0,0,.12);
+    z-index:82;
+    white-space:nowrap;
+    pointer-events:none;
+  }
+  .watch-name-tag.hidden{ display:none; }
   .watch-card{
     position:absolute;
     width:110px; height:165px;
@@ -1336,6 +1353,25 @@
     pointer-events:none;
   }
   .exchange-pop.hidden{display:none;}
+  .exchange-bottom-pop{
+    position:fixed;
+    left:50%;
+    bottom:14px;
+    transform:translateX(-50%);
+    background:rgba(20,20,20,.92);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+    padding:10px 12px;
+    z-index:86;
+    font-weight:900;
+    white-space:nowrap;
+    min-width:260px;
+    text-align:center;
+    pointer-events:none;
+  }
+  .exchange-bottom-pop.hidden{display:none;}
 
   /* ★ 5：ポップ（対象選択中） */
   .witness-pop{
@@ -1494,6 +1530,7 @@
 
 <!-- ★ 6：中央拡大表示（カードのみ） -->
 <div id="watchBackdrop" class="watch-backdrop hidden" aria-hidden="true">
+  <div id="watchNameTag" class="watch-name-tag hidden"></div>
   <div id="watchHand" class="watch-hand"></div>
 </div>
 
@@ -1585,6 +1622,7 @@
 <div id="hostSelectingPop" class="host-selecting-pop hidden">ホストが人数を選択中</div>
 <div id="pickPop" class="pick-pop hidden">9の効果：最小カードをクリックして選択</div>
 <div id="exchangePop" class="exchange-pop hidden">8の効果：対象プレイヤーを選択</div>
+<div id="exchangeBottomPop" class="exchange-bottom-pop hidden">手札から渡したいカードを選んでください。</div>
 <div id="witnessPop" class="witness-pop hidden">5の効果：正体カード（裏）をクリックして対象選択</div>
 <div id="votePop" class="vote-pop hidden">7の効果：投票するプレイヤーを選択</div>
 
@@ -1733,6 +1771,7 @@ const copyLinkBtn = document.getElementById('copyLinkBtn');
 const hostSelectingPop = document.getElementById('hostSelectingPop');
 const pickPop = document.getElementById('pickPop');
 const exchangePop = document.getElementById('exchangePop');
+const exchangeBottomPop = document.getElementById('exchangeBottomPop');
 const witnessPop = document.getElementById('witnessPop');
 const votePop = document.getElementById('votePop');
 
@@ -1749,6 +1788,7 @@ const linkLayer = document.getElementById('linkLayer');
 const watchLayer = document.getElementById('watchLayer');
 const witnessLayer = document.getElementById('witnessLayer');
 const gun2Layer = document.getElementById('gun2Layer');
+const watchNameTag = document.getElementById('watchNameTag');
 
 const discardStackEl = document.getElementById('discardStack');
 const card1SpotEl = document.getElementById('card1Spot');
@@ -2195,8 +2235,28 @@ function updateExchangeLink(){
 
   const x1 = (br.left + br.width/2) - pcRect.left;
   const y1 = (br.top  + br.height/2) - pcRect.top;
-  const x2 = (tr.left + tr.width/2) - pcRect.left;
-  const y2 = (tr.top  + tr.height/2) - pcRect.top;
+  let x2 = (tr.left + tr.width/2) - pcRect.left;
+  let y2 = (tr.top  + tr.height/2) - pcRect.top;
+
+  if (targetId !== state.userId){
+    const circleEl = tgEl.querySelector('.mini-hand-circle');
+    if (circleEl){
+      const cr = circleEl.getBoundingClientRect();
+      const cx = (cr.left + cr.width/2) - pcRect.left;
+      const cy = (cr.top + cr.height/2) - pcRect.top;
+      const dx = cx - x1;
+      const dy = cy - y1;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const radius = Math.min(cr.width, cr.height) / 2 + 2;
+      const ux = dx / dist;
+      const uy = dy / dist;
+      x2 = cx - ux * radius;
+      y2 = cy - uy * radius;
+    } else {
+      x2 = (tr.left + tr.width/2) - pcRect.left;
+      y2 = (tr.top  + tr.height) - pcRect.top + 18;
+    }
+  }
 
   const w = Math.max(1, pcRect.width);
   const h = Math.max(1, pcRect.height);
@@ -2543,17 +2603,30 @@ function updateTurnUI(){
   const exActive = isExchangeActive();
   if (!exActive){
     exchangePop.classList.add('hidden');
+    exchangeBottomPop.classList.add('hidden');
   } else {
-    exchangePop.classList.remove('hidden');
     const ex = state.exchange8;
-    if (ex?.phase === 'pickTarget'){
-      exchangePop.textContent = '8の効果：対象プレイヤーを選択';
-    } else if (ex?.phase === 'targetPickMin'){
-      exchangePop.textContent = '8の効果：対象が最小カードを選択中';
-    } else if (ex?.phase === 'byPickReturn'){
-      exchangePop.textContent = '8の効果：返すカードを選択';
-    } else {
-      exchangePop.textContent = '8の効果：処理中';
+    const isExBy = ex?.by === state.userId;
+    const isExTarget = ex?.targetId === state.userId;
+    const showBottomPop = !!(ex?.phase === 'byPickReturn' && isExBy);
+
+    exchangeBottomPop.classList.toggle('hidden', !showBottomPop);
+
+    const shouldHideTop = showBottomPop;
+    exchangePop.classList.toggle('hidden', shouldHideTop);
+
+    if (!shouldHideTop){
+      if (ex?.phase === 'pickTarget'){
+        exchangePop.textContent = '8の効果：対象プレイヤーを選択';
+      } else if (ex?.phase === 'targetPickMin'){
+        exchangePop.textContent = isExTarget
+          ? '小さいほうのカードを選んで、相手に渡してください。'
+          : '8の効果：対象が最小カードを選択中';
+      } else if (ex?.phase === 'byPickReturn'){
+        exchangePop.textContent = '8の効果：返すカードを選択';
+      } else {
+        exchangePop.textContent = '8の効果：処理中';
+      }
     }
   }
 
@@ -3679,6 +3752,7 @@ function syncWatchCenterOverlay(){
 
   watchClosePop.classList.add('hidden');
   watchClosePop.setAttribute('aria-hidden', 'true');
+  watchNameTag?.classList.add('hidden');
 
   if (!iAmBy){
     watchBackdrop.classList.add('hidden');
@@ -3699,6 +3773,11 @@ function syncWatchCenterOverlay(){
 
   watchClosePop.classList.remove('hidden');
   watchClosePop.setAttribute('aria-hidden', 'false');
+  if (watchNameTag){
+    const targetName = latestPlayers.find((p) => p.id === w.targetId)?.name || 'プレイヤー';
+    watchNameTag.textContent = targetName;
+    watchNameTag.classList.remove('hidden');
+  }
 }
 
 /* ★ 6：画面下「はい」で閉じる → ターン終了 */
@@ -4803,7 +4882,13 @@ async function pickVote7Target(targetId){
   if (v.phase !== 'voting') return;
   const myId = state.userId;
   if (!targetId || targetId === myId) return;
-  if (v.votes && v.votes[myId]) return;
+  if (v.votes && v.votes[myId]){
+    const players = await getSeatedPlayers();
+    if (players.length){
+      const votedCount = players.filter(p => v.votes?.[p.id]).length;
+      if (votedCount === players.length) return;
+    }
+  }
 
   await set(ref(db, `rooms/${state.roomCode}/vote7/votes/${myId}`), targetId);
 
@@ -6027,6 +6112,7 @@ function renderPlayerCircle(players){
   const vPhase = vote7Phase();
   const vVotes = state.vote7?.votes || {};
   const iHaveVoted = !!vVotes[state.userId];
+  const allVoted = vActive && vPhase === 'voting' && players.every(p => vVotes[p.id]);
   const showVotedStatus = vActive && vPhase === 'voting' && iHaveVoted;
   const voteResults = (vActive && vPhase === 'reveal') ? buildVote7Results(state.vote7, players) : {};
   const playerNameMap = new Map(players.map(p => [p.id, p.name]));
@@ -6127,7 +6213,7 @@ function renderPlayerCircle(players){
 
     /* ★ 7（投票）：対象選択（全員） */
     if (vActive && vPhase === 'voting'){
-      if (!iHaveVoted && p.id !== state.userId){
+      if (!allVoted && p.id !== state.userId){
         tag.classList.add('vote7-targetable');
         tag.addEventListener('click', async () => {
           await pickVote7Target(p.id);
