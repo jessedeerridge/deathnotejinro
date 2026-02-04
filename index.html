@@ -104,7 +104,7 @@
   /* ★ センター捨て札スタック（表向きで積み上げ） */
   .discard-stack{
     position:absolute;
-    left:50%; top:calc(50% + 8px);
+    left:50%; top:calc(50% + 16px);
     transform:translate(-50%,-50%);
     width:0; height:0;
     z-index:11;
@@ -293,6 +293,7 @@
     border-radius:50%;
     pointer-events:none;
     z-index:1;
+    display:none;
   }
   .player-tag .mini-card{
     position:absolute;left:50%;top:0;width:24px;height:33px;
@@ -470,8 +471,9 @@
     transform:translate(-50%,-150px);
     padding:4px 10px;
     border-radius:999px;
-    background:#f8f8f8;
-    border:1px solid #ddd;
+    background:#111;
+    border:1px solid #111;
+    color:#fff;
     font-size:12px;
     font-weight:700;
     z-index:82;
@@ -1271,6 +1273,11 @@
   /* ★ここで上下位置調整（上に上げるほどマイナスを大きく） */
   margin-top:-1px;
 }
+.card-circle.card-circle-gold{
+  background:#d4af37;
+  border:1px solid #a57c1b;
+  color:#111;
+}
 
 /* ★ カード名も少し上に寄せる */
 .card-title{
@@ -1471,8 +1478,10 @@
     animation: voteTagPulse 820ms ease-in-out infinite;
   }
   .player-tag.vote7-voted{
-    outline:2px solid #111;
-    outline-offset:2px;
+    outline:none;
+  }
+  .player-tag.vote7-voted .player-label{
+    box-shadow:0 0 0 2px #111;
   }
   .vote7-results{
     position:absolute;
@@ -1482,7 +1491,7 @@
     display:flex;
     flex-direction:column;
     gap:4px;
-    z-index:15;
+    z-index:35;
     pointer-events:none;
   }
   .vote7-result-tag{
@@ -1494,6 +1503,7 @@
     border-radius:999px;
     box-shadow:0 8px 18px rgba(0,0,0,.2);
     white-space:nowrap;
+    z-index:36;
   }
 </style>
 </head>
@@ -1920,6 +1930,9 @@ function buildCardFace(cardId, { size = '' } = {}){
   const circle = document.createElement('div');
   circle.className = 'card-circle';
   circle.textContent = info.id;
+  if (info.id === '0' || info.id === '1'){
+    circle.classList.add('card-circle-gold');
+  }
 
   const title = document.createElement('div');
   title.className = 'card-title';
@@ -2630,9 +2643,11 @@ function updateTurnUI(){
     if (ex?.phase === 'pickTarget'){
       exchangePop.textContent = '8の効果：対象プレイヤーを選択';
     } else if (ex?.phase === 'targetPickMin'){
-      exchangePop.textContent = isTarget
-        ? '8の効果：小さいほうのカードを選んで、相手に渡してください。'
-        : '8の効果：対象が最小カードを選択中';
+      showTopPop = false;
+      if (isTarget){
+        exchangeReturnPop.textContent = '小さいほうのカードを選んで、相手に渡してください。';
+        exchangeReturnPop.classList.remove('hidden');
+      }
     } else if (ex?.phase === 'byPickReturn'){
       if (isBy){
         showTopPop = false;
@@ -6147,6 +6162,9 @@ function renderPlayerCircle(players){
   const iHaveVoted = !!vVotes[state.userId];
   const allVoted = vActive && vPhase === 'voting' && players.every(p => vVotes[p.id]);
   const showVotedStatus = vActive && vPhase === 'voting' && iHaveVoted;
+  const votePreviewTargetId = (vActive && vPhase === 'voting' && iHaveVoted)
+    ? vVotes[state.userId]
+    : null;
   const voteResults = (vActive && vPhase === 'reveal') ? buildVote7Results(state.vote7, players) : {};
   const playerNameMap = new Map(players.map(p => [p.id, p.name]));
   const sh = getShinigami13();
@@ -6483,6 +6501,17 @@ function renderPlayerCircle(players){
     }
 
     playerCircle.appendChild(tag);
+
+    // ★ 7：自分の投票だけ先行表示
+    if (vActive && vPhase === 'voting' && votePreviewTargetId && p.id === votePreviewTargetId){
+      const resultWrap = document.createElement('div');
+      resultWrap.className = 'vote7-results';
+      const item = document.createElement('div');
+      item.className = 'vote7-result-tag';
+      item.textContent = `👈${playerNameMap.get(state.userId) || '自分'}`;
+      resultWrap.appendChild(item);
+      tag.appendChild(resultWrap);
+    }
 
     // ★ 7：結果表示（投票者タグを右側に縦表示）
     if (vActive && vPhase === 'reveal'){
